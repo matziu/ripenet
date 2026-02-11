@@ -1,6 +1,42 @@
 import dagre from 'dagre'
 import type { Node, Edge } from '@xyflow/react'
-import type { ProjectTopology } from '@/types'
+import type { ProjectTopology, VLANTopology } from '@/types'
+
+// Color palette for VLANs by purpose
+const VLAN_PURPOSE_COLORS: Record<string, { bg: string; border: string; text: string; dot: string }> = {
+  management: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  'user workstations': { bg: 'bg-blue-500/10', border: 'border-blue-500/40', text: 'text-blue-700 dark:text-blue-400', dot: 'bg-blue-500' },
+  'server farm': { bg: 'bg-violet-500/10', border: 'border-violet-500/40', text: 'text-violet-700 dark:text-violet-400', dot: 'bg-violet-500' },
+  voip: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-700 dark:text-amber-400', dot: 'bg-amber-500' },
+  guest: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-700 dark:text-rose-400', dot: 'bg-rose-500' },
+  iot: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/40', text: 'text-cyan-700 dark:text-cyan-400', dot: 'bg-cyan-500' },
+  dmz: { bg: 'bg-orange-500/10', border: 'border-orange-500/40', text: 'text-orange-700 dark:text-orange-400', dot: 'bg-orange-500' },
+}
+
+// Fallback colors by index for unmapped purposes
+const VLAN_INDEX_COLORS = [
+  { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  { bg: 'bg-blue-500/10', border: 'border-blue-500/40', text: 'text-blue-700 dark:text-blue-400', dot: 'bg-blue-500' },
+  { bg: 'bg-violet-500/10', border: 'border-violet-500/40', text: 'text-violet-700 dark:text-violet-400', dot: 'bg-violet-500' },
+  { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-700 dark:text-amber-400', dot: 'bg-amber-500' },
+  { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-700 dark:text-rose-400', dot: 'bg-rose-500' },
+  { bg: 'bg-cyan-500/10', border: 'border-cyan-500/40', text: 'text-cyan-700 dark:text-cyan-400', dot: 'bg-cyan-500' },
+]
+
+export function getVlanColor(purpose: string, index: number) {
+  const key = purpose.toLowerCase()
+  return VLAN_PURPOSE_COLORS[key] ?? VLAN_INDEX_COLORS[index % VLAN_INDEX_COLORS.length]
+}
+
+export interface VlanEmbedded {
+  id: number
+  vlanId: number
+  name: string
+  purpose: string
+  subnets: string[]
+  hostCount: number
+  colorIndex: number
+}
 
 export interface SiteNodeData {
   label: string
@@ -9,17 +45,7 @@ export interface SiteNodeData {
   hostCount: number
   siteId: number
   expanded: boolean
-  [key: string]: unknown
-}
-
-export interface VlanNodeData {
-  label: string
-  vlanId: number
-  name: string
-  purpose: string
-  subnetCount: number
-  hostCount: number
-  parentSiteId: number
+  vlans: VlanEmbedded[]
   [key: string]: unknown
 }
 
@@ -30,10 +56,31 @@ export interface TunnelEdgeData {
   [key: string]: unknown
 }
 
-const SITE_WIDTH = 200
-const SITE_HEIGHT = 80
-const VLAN_WIDTH = 160
-const VLAN_HEIGHT = 50
+const SITE_WIDTH_COLLAPSED = 200
+const SITE_HEIGHT_COLLAPSED = 80
+const SITE_WIDTH_EXPANDED = 280
+const VLAN_ROW_HEIGHT = 36
+const SITE_EXPANDED_PADDING = 80
+
+function getSiteSize(expanded: boolean, vlanCount: number) {
+  if (!expanded) return { w: SITE_WIDTH_COLLAPSED, h: SITE_HEIGHT_COLLAPSED }
+  return {
+    w: SITE_WIDTH_EXPANDED,
+    h: SITE_EXPANDED_PADDING + vlanCount * VLAN_ROW_HEIGHT,
+  }
+}
+
+function vlansToEmbedded(vlans: VLANTopology[]): VlanEmbedded[] {
+  return vlans.map((vlan, i) => ({
+    id: vlan.id,
+    vlanId: vlan.vlan_id,
+    name: vlan.name,
+    purpose: vlan.purpose,
+    subnets: vlan.subnets.map((s) => s.network),
+    hostCount: vlan.subnets.reduce((sum, s) => sum + s.hosts.length, 0),
+    colorIndex: i,
+  }))
+}
 
 export function topologyToFlow(
   topology: ProjectTopology,
@@ -43,7 +90,6 @@ export function topologyToFlow(
   const nodes: Node[] = []
   const edges: Edge[] = []
 
-  // Create site nodes
   topology.sites.forEach((site) => {
     const totalHosts = site.vlans.reduce(
       (sum, v) => sum + v.subnets.reduce((s, sub) => s + sub.hosts.length, 0),
@@ -62,37 +108,9 @@ export function topologyToFlow(
         hostCount: totalHosts,
         siteId: site.id,
         expanded: isExpanded,
+        vlans: isExpanded ? vlansToEmbedded(site.vlans) : [],
       } satisfies SiteNodeData,
     })
-
-    // If expanded, add VLAN nodes
-    if (isExpanded) {
-      site.vlans.forEach((vlan) => {
-        const vlanHostCount = vlan.subnets.reduce((s, sub) => s + sub.hosts.length, 0)
-        nodes.push({
-          id: `vlan-${vlan.id}`,
-          type: 'vlanNode',
-          position: savedPositions?.[`vlan-${vlan.id}`] ?? { x: 0, y: 0 },
-          data: {
-            label: `VLAN ${vlan.vlan_id}`,
-            vlanId: vlan.id,
-            name: vlan.name,
-            purpose: vlan.purpose,
-            subnetCount: vlan.subnets.length,
-            hostCount: vlanHostCount,
-            parentSiteId: site.id,
-          } satisfies VlanNodeData,
-        })
-
-        edges.push({
-          id: `site-${site.id}-vlan-${vlan.id}`,
-          source: `site-${site.id}`,
-          target: `vlan-${vlan.id}`,
-          type: 'default',
-          style: { stroke: '#94a3b8', strokeDasharray: '4 4' },
-        })
-      })
-    }
   })
 
   // Create tunnel edges
@@ -125,11 +143,11 @@ function applyDagreLayout(
 ): { nodes: Node[]; edges: Edge[] } {
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'TB', nodesep: 80, ranksep: 100 })
+  g.setGraph({ rankdir: 'TB', nodesep: 100, ranksep: 120 })
 
   nodes.forEach((node) => {
-    const w = node.type === 'vlanNode' ? VLAN_WIDTH : SITE_WIDTH
-    const h = node.type === 'vlanNode' ? VLAN_HEIGHT : SITE_HEIGHT
+    const d = node.data as SiteNodeData
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
     g.setNode(node.id, { width: w, height: h })
   })
 
@@ -141,8 +159,8 @@ function applyDagreLayout(
 
   const layoutedNodes = nodes.map((node) => {
     const n = g.node(node.id)
-    const w = node.type === 'vlanNode' ? VLAN_WIDTH : SITE_WIDTH
-    const h = node.type === 'vlanNode' ? VLAN_HEIGHT : SITE_HEIGHT
+    const d = node.data as SiteNodeData
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
     return {
       ...node,
       position: { x: n.x - w / 2, y: n.y - h / 2 },

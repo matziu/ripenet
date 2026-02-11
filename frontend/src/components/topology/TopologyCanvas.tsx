@@ -17,12 +17,10 @@ import { projectsApi } from '@/api/endpoints'
 import { useTopologyStore } from '@/stores/topology.store'
 import { topologyToFlow, savePositions, loadPositions } from '@/lib/topology.utils'
 import { SiteNode } from './nodes/SiteNode'
-import { VlanNode } from './nodes/VlanNode'
 import { TunnelEdge } from './edges/TunnelEdge'
 
 const nodeTypes: NodeTypes = {
   siteNode: SiteNode,
-  vlanNode: VlanNode,
 }
 
 const edgeTypes: EdgeTypes = {
