@@ -9,8 +9,7 @@ const statusColors: Record<string, string> = {
   down: '#ef4444',
 }
 
-export function TunnelEdge(props: EdgeProps) {
-  const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data } = props
+export function TunnelEdge({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, id, markerEnd, markerStart }: EdgeProps) {
   const d = data as TunnelEdgeData
 
   const [edgePath, labelX, labelY] = getBezierPath({
@@ -23,8 +22,10 @@ export function TunnelEdge(props: EdgeProps) {
   return (
     <>
       <BaseEdge
-        {...props}
+        id={id}
         path={edgePath}
+        markerEnd={markerEnd}
+        markerStart={markerStart}
         style={{ stroke: color, strokeWidth: 2 }}
       />
       <EdgeLabelRenderer>
