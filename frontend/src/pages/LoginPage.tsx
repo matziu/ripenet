@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/api/endpoints'
+import apiClient from '@/api/client'
 import { toast } from 'sonner'
 
 export function LoginPage() {
@@ -8,13 +10,23 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+  const queryClient = useQueryClient()
+
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
+
+  // Fetch CSRF cookie on mount
+  useEffect(() => {
+    apiClient.get('/auth/login/')
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
       await authApi.login(username, password)
-      navigate('/')
+      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+      navigate(from, { replace: true })
     } catch {
       toast.error('Invalid credentials')
     } finally {
