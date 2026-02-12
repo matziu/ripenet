@@ -264,17 +264,18 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
                     <th className="px-3 py-2 text-left font-medium">Site</th>
                     {state.vlanTemplates.map((tpl) => (
                       <th key={tpl.tempId} className="px-3 py-2 text-left font-medium">
-                        {tpl.name || `VLAN ${tpl.vlanId}`}
+                        {tpl.name || '(unnamed)'}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {state.sites.map((site) => (
+                  {state.sites.map((site, siteIdx) => (
                     <tr key={site.tempId} className="border-b border-border">
                       <td className="px-3 py-2 font-medium">{site.name || '(unnamed)'}</td>
                       {state.vlanTemplates.map((tpl, tplIdx) => {
                         const ov = getOverride(site.tempId, tplIdx)
+                        const vid = getVlanIdForSite(tpl.vlanId, siteIdx, state)
                         return (
                           <td key={tpl.tempId} className="px-3 py-2">
                             <div className="flex items-center gap-2">
@@ -287,7 +288,7 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
                                   }
                                   className="rounded"
                                 />
-                                On
+                                <span className="font-mono">{vid}</span>
                               </label>
                               {!ov.skip && (
                                 <input
