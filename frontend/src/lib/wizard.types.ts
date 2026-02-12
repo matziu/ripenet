@@ -64,7 +64,9 @@ export interface WizardState {
   vlanTemplates: WizardVlanTemplate[]
   perSiteOverrides: Record<string, WizardSiteOverride[]>
 
-  // Step 4: Address Plan (computed by VLSM)
+  // Step 4: Address Plan
+  addressingMode: 'vlsm' | 'vlan-aligned'
+  vlanAlignedPrefix: number    // subnet prefix for vlan-aligned mode (default 24)
   vlsmResult?: VLSMResult
   addressPlan: WizardAddressEntry[]
 
@@ -84,6 +86,8 @@ export const initialWizardState: WizardState = {
   sites: [],
   vlanTemplates: [],
   perSiteOverrides: {},
+  addressingMode: 'vlsm',
+  vlanAlignedPrefix: 24,
   addressPlan: [],
   tunnelMode: 'none',
   tunnelType: 'wireguard',

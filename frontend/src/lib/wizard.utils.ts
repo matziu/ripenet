@@ -61,6 +61,76 @@ export function buildAddressPlan(
   return plan
 }
 
+/**
+ * Build address plan using VLAN-aligned addressing.
+ * Each site gets a /16 block from the supernet.
+ * VLAN ID maps to the 3rd octet → e.g. VLAN 100 = x.x.100.0/24
+ */
+export function buildVlanAlignedPlan(state: WizardState): WizardAddressEntry[] {
+  const [ipStr, prefixStr] = state.supernet.split('/')
+  const prefix = parseInt(prefixStr, 10)
+  const parts = ipStr.split('.').map(Number)
+  const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
+  // Align to /16 boundary
+  const base16 = baseNum & 0xffff0000
+  const subnetPrefix = state.vlanAlignedPrefix
+
+  const plan: WizardAddressEntry[] = []
+
+  for (let siteIdx = 0; siteIdx < state.sites.length; siteIdx++) {
+    const site = state.sites[siteIdx]
+    const overrides = state.perSiteOverrides[site.tempId] ?? []
+
+    // Each site gets a /16 block: base + siteIdx * 65536
+    const siteBaseNum = (base16 + (siteIdx << 16)) >>> 0
+
+    for (let i = 0; i < state.vlanTemplates.length; i++) {
+      const tpl = state.vlanTemplates[i]
+      const override = overrides[i]
+      if (override?.skip) continue
+
+      // VLAN ID in 3rd octet
+      const subnetNum = ((siteBaseNum & 0xffff0000) | ((tpl.vlanId & 0xff) << 8)) >>> 0
+      const subnet = numToIp(subnetNum) + '/' + subnetPrefix
+      plan.push({
+        siteTempId: site.tempId,
+        vlanTempId: tpl.tempId,
+        subnet,
+        gateway: computeGateway(subnet),
+      })
+    }
+  }
+
+  return plan
+}
+
+/** Validate VLAN-aligned mode constraints. Returns error messages or empty array. */
+export function validateVlanAligned(state: WizardState): string[] {
+  const errors: string[] = []
+  if (!state.supernet.includes('/')) return ['Invalid supernet']
+  const prefix = parseInt(state.supernet.split('/')[1], 10)
+
+  if (prefix > 16) {
+    errors.push('VLAN-aligned mode requires a supernet of /16 or larger')
+  }
+
+  const available16Blocks = prefix <= 16 ? 1 << (16 - prefix) : 0
+  if (state.sites.length > available16Blocks) {
+    errors.push(
+      `Supernet /${prefix} provides ${available16Blocks} site block(s) (/16 each), but ${state.sites.length} sites are defined`,
+    )
+  }
+
+  const overflowing = state.vlanTemplates.filter((t) => t.vlanId > 255)
+  if (overflowing.length > 0) {
+    errors.push(
+      `VLAN IDs must be 0–255 for 3rd-octet mapping. Problem: ${overflowing.map((t) => `VLAN ${t.vlanId}`).join(', ')}`,
+    )
+  }
+
+  return errors
+}
+
 /** Compute full subnet details from a CIDR string */
 export function computeSubnetDetails(cidr: string) {
   const [ip, prefixStr] = cidr.split('/')
