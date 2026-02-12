@@ -53,6 +53,9 @@ export interface TunnelEdgeData {
   label: string
   tunnelType: string
   status: string
+  ipA: string
+  ipB: string
+  offsetSide: number
   [key: string]: unknown
 }
 
@@ -80,6 +83,282 @@ function vlansToEmbedded(vlans: VLANTopology[]): VlanEmbedded[] {
     hostCount: vlan.subnets.reduce((sum, s) => sum + s.hosts.length, 0),
     colorIndex: i,
   }))
+}
+
+// --- Layout analysis ---
+
+type LayoutStrategy = 'polygon' | 'dagre'
+
+function analyzeTopology(nodes: Node[], edges: Edge[]): LayoutStrategy {
+  const n = nodes.length
+  if (n <= 1) return 'dagre'
+  if (n > 5) return 'dagre'
+
+  // Check for full mesh: every pair of nodes is connected
+  const fullMeshEdgeCount = (n * (n - 1)) / 2
+  if (edges.length === fullMeshEdgeCount) {
+    const nodeIds = new Set(nodes.map((node) => node.id))
+    const connectedPairs = new Set<string>()
+    for (const edge of edges) {
+      if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
+        const pair = [edge.source, edge.target].sort().join('|')
+        connectedPairs.add(pair)
+      }
+    }
+    if (connectedPairs.size === fullMeshEdgeCount) return 'polygon'
+  }
+
+  return 'dagre'
+}
+
+function applyPolygonLayout(
+  nodes: Node[],
+  edges: Edge[],
+): { nodes: Node[]; edges: Edge[] } {
+  const n = nodes.length
+
+  // Special case: 2 nodes → place side by side
+  if (n === 2) {
+    const sizes = nodes.map((node) => {
+      const d = node.data as SiteNodeData
+      return getSiteSize(d.expanded, d.vlans.length)
+    })
+    const layoutedNodes = nodes.map((node, i) => ({
+      ...node,
+      position: { x: i * (sizes[i].w + 250), y: 0 },
+    }))
+    return { nodes: layoutedNodes, edges: assignHandles(layoutedNodes, edges) }
+  }
+
+  // Find max node size for radius calculation
+  let maxDim = 0
+  for (const node of nodes) {
+    const d = node.data as SiteNodeData
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    maxDim = Math.max(maxDim, w, h)
+  }
+
+  const radius = Math.max(250, maxDim * 1.8)
+  const startAngle = -Math.PI / 2 // Start from top
+
+  const layoutedNodes = nodes.map((node, i) => {
+    const d = node.data as SiteNodeData
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    const angle = startAngle + (2 * Math.PI * i) / n
+    return {
+      ...node,
+      position: {
+        x: Math.cos(angle) * radius - w / 2,
+        y: Math.sin(angle) * radius - h / 2,
+      },
+    }
+  })
+
+  return { nodes: layoutedNodes, edges: assignHandles(layoutedNodes, edges) }
+}
+
+/** Check if any node bounding boxes overlap (with padding). */
+export function hasOverlaps(nodes: Node[], padding = 30): boolean {
+  const boxes = nodes.map((node) => {
+    const d = node.data as SiteNodeData
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    return {
+      left: node.position.x - padding,
+      right: node.position.x + w + padding,
+      top: node.position.y - padding,
+      bottom: node.position.y + h + padding,
+    }
+  })
+
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i]
+      const b = boxes[j]
+      if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+// --- Handle & label offset assignment ---
+
+/** Angular distance between two angles in radians, result in [0, π]. */
+function angleDist(a: number, b: number): number {
+  let d = b - a
+  d = ((d % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI
+  return Math.abs(d)
+}
+
+const HANDLE_DIRECTIONS: Array<{ suffix: string; angle: number }> = [
+  { suffix: 'right', angle: 0 },
+  { suffix: 'bottom', angle: Math.PI / 2 },
+  { suffix: 'left', angle: Math.PI },
+  { suffix: 'top', angle: -Math.PI / 2 },
+]
+
+/**
+ * Assign sourceHandle/targetHandle per edge + offsetSide for label placement.
+ *
+ * 1. For each node, collect all edges with their angle to the peer node.
+ * 2. Sort by angle, then greedily assign the closest AVAILABLE handle
+ *    so that no two edges at the same node share a handle.
+ * 3. Compute offsetSide (+1 or -1) per edge so IP labels are pushed
+ *    away from the graph centroid — ensures symmetric, non-overlapping labels.
+ */
+function assignHandles(nodes: Node[], edges: Edge[]): Edge[] {
+  // 1. Compute node centers
+  const centerMap = new Map<string, { cx: number; cy: number }>()
+  for (const node of nodes) {
+    const d = node.data as SiteNodeData
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    centerMap.set(node.id, {
+      cx: node.position.x + w / 2,
+      cy: node.position.y + h / 2,
+    })
+  }
+
+  // 2. Graph centroid
+  let centroidX = 0
+  let centroidY = 0
+  for (const c of centerMap.values()) {
+    centroidX += c.cx
+    centroidY += c.cy
+  }
+  centroidX /= centerMap.size
+  centroidY /= centerMap.size
+
+  // 3. For each node, collect edges arriving/departing with their angle
+  interface EdgeAtNode {
+    edgeIndex: number
+    angle: number
+    role: 'source' | 'target'
+  }
+  const nodeEdgeMap = new Map<string, EdgeAtNode[]>()
+
+  edges.forEach((edge, i) => {
+    const src = centerMap.get(edge.source)
+    const tgt = centerMap.get(edge.target)
+    if (!src || !tgt) return
+
+    // Angle from source toward target
+    const fwdAngle = Math.atan2(tgt.cy - src.cy, tgt.cx - src.cx)
+
+    if (!nodeEdgeMap.has(edge.source)) nodeEdgeMap.set(edge.source, [])
+    nodeEdgeMap.get(edge.source)!.push({ edgeIndex: i, angle: fwdAngle, role: 'source' })
+
+    // Angle from target toward source (reverse)
+    const revAngle = Math.atan2(src.cy - tgt.cy, src.cx - tgt.cx)
+
+    if (!nodeEdgeMap.has(edge.target)) nodeEdgeMap.set(edge.target, [])
+    nodeEdgeMap.get(edge.target)!.push({ edgeIndex: i, angle: revAngle, role: 'target' })
+  })
+
+  // 4. Per-node greedy handle assignment
+  const edgeHandles: Array<{ sourceHandle?: string; targetHandle?: string }> =
+    edges.map(() => ({}))
+
+  for (const [, edgesAtNode] of nodeEdgeMap) {
+    // Sort by angle so we assign in angular order
+    edgesAtNode.sort((a, b) => a.angle - b.angle)
+
+    const usedSuffixes = new Set<string>()
+
+    for (const entry of edgesAtNode) {
+      // Find the closest available handle direction
+      const candidates = HANDLE_DIRECTIONS
+        .filter((h) => !usedSuffixes.has(h.suffix))
+        .sort((a, b) => angleDist(entry.angle, a.angle) - angleDist(entry.angle, b.angle))
+
+      // Fallback: if all 4 taken, pick absolute closest (will share)
+      const best = candidates[0] ?? HANDLE_DIRECTIONS
+        .slice()
+        .sort((a, b) => angleDist(entry.angle, a.angle) - angleDist(entry.angle, b.angle))[0]
+
+      usedSuffixes.add(best.suffix)
+
+      const handleId = `${entry.role}-${best.suffix}`
+      if (entry.role === 'source') {
+        edgeHandles[entry.edgeIndex].sourceHandle = handleId
+      } else {
+        edgeHandles[entry.edgeIndex].targetHandle = handleId
+      }
+    }
+  }
+
+  // 5. Per-edge offsetSide: push labels away from graph centroid
+  return edges.map((edge, i) => {
+    const src = centerMap.get(edge.source)
+    const tgt = centerMap.get(edge.target)
+
+    let offsetSide = 1
+    if (src && tgt) {
+      const edgeMidX = (src.cx + tgt.cx) / 2
+      const edgeMidY = (src.cy + tgt.cy) / 2
+      const dx = tgt.cx - src.cx
+      const dy = tgt.cy - src.cy
+      const len = Math.sqrt(dx * dx + dy * dy) || 1
+
+      // Perpendicular normal (−dy, dx) / len
+      const nx = -dy / len
+      const ny = dx / len
+
+      // Does the perpendicular point away from centroid?
+      const toMidX = edgeMidX - centroidX
+      const toMidY = edgeMidY - centroidY
+      const dot = nx * toMidX + ny * toMidY
+      offsetSide = dot >= 0 ? 1 : -1
+    }
+
+    return {
+      ...edge,
+      sourceHandle: edgeHandles[i].sourceHandle ?? edge.sourceHandle,
+      targetHandle: edgeHandles[i].targetHandle ?? edge.targetHandle,
+      data: {
+        ...edge.data,
+        offsetSide,
+      },
+    }
+  })
+}
+
+function applyDagreLayout(
+  nodes: Node[],
+  edges: Edge[],
+): { nodes: Node[]; edges: Edge[] } {
+  const g = new dagre.graphlib.Graph()
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({
+    rankdir: 'LR',
+    nodesep: 150,
+    ranksep: 250,
+    edgesep: 30,
+  })
+
+  nodes.forEach((node) => {
+    const d = node.data as SiteNodeData
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    g.setNode(node.id, { width: w + 40, height: h + 40 })
+  })
+
+  edges.forEach((edge) => {
+    g.setEdge(edge.source, edge.target, { minlen: 2 })
+  })
+
+  dagre.layout(g)
+
+  const layoutedNodes = nodes.map((node) => {
+    const n = g.node(node.id)
+    const d = node.data as SiteNodeData
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    return {
+      ...node,
+      position: { x: n.x - w / 2, y: n.y - h / 2 },
+    }
+  })
+
+  return { nodes: layoutedNodes, edges: assignHandles(layoutedNodes, edges) }
 }
 
 export function topologyToFlow(
@@ -125,49 +404,35 @@ export function topologyToFlow(
         label: tunnel.tunnel_subnet,
         tunnelType: tunnel.tunnel_type,
         status: tunnel.status,
+        ipA: tunnel.ip_a,
+        ipB: tunnel.ip_b,
+        offsetSide: 1,
       } satisfies TunnelEdgeData,
     })
   })
 
   // Auto-layout if no saved positions
-  if (!savedPositions || Object.keys(savedPositions).length === 0) {
+  const needsLayout = !savedPositions || Object.keys(savedPositions).length === 0
+
+  if (needsLayout) {
+    const strategy = analyzeTopology(nodes, edges)
+    if (strategy === 'polygon') {
+      return applyPolygonLayout(nodes, edges)
+    }
     return applyDagreLayout(nodes, edges)
   }
 
-  return { nodes, edges }
-}
-
-function applyDagreLayout(
-  nodes: Node[],
-  edges: Edge[],
-): { nodes: Node[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph()
-  g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'TB', nodesep: 100, ranksep: 120 })
-
-  nodes.forEach((node) => {
-    const d = node.data as SiteNodeData
-    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
-    g.setNode(node.id, { width: w, height: h })
-  })
-
-  edges.forEach((edge) => {
-    g.setEdge(edge.source, edge.target)
-  })
-
-  dagre.layout(g)
-
-  const layoutedNodes = nodes.map((node) => {
-    const n = g.node(node.id)
-    const d = node.data as SiteNodeData
-    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
-    return {
-      ...node,
-      position: { x: n.x - w / 2, y: n.y - h / 2 },
+  // Saved positions exist — check for overlaps and re-layout if needed
+  if (hasOverlaps(nodes)) {
+    const strategy = analyzeTopology(nodes, edges)
+    if (strategy === 'polygon') {
+      return applyPolygonLayout(nodes, edges)
     }
-  })
+    return applyDagreLayout(nodes, edges)
+  }
 
-  return { nodes: layoutedNodes, edges }
+  // Saved positions are fine — still assign handles based on positions
+  return { nodes, edges: assignHandles(nodes, edges) }
 }
 
 export function savePositions(projectId: number, nodes: Node[]) {
@@ -188,4 +453,8 @@ export function loadPositions(projectId: number): Record<string, { x: number; y:
     }
   }
   return undefined
+}
+
+export function clearPositions(projectId: number) {
+  localStorage.removeItem(`topology-positions-${projectId}`)
 }

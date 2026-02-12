@@ -4,12 +4,14 @@ import type { NodeProps } from '@xyflow/react'
 import type { SiteNodeData, VlanEmbedded } from '@/lib/topology.utils'
 import { getVlanColor } from '@/lib/topology.utils'
 import { useTopologyStore } from '@/stores/topology.store'
+import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
 import { Building2, ChevronDown, ChevronRight, Network } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
   const setSelectedVlan = useTopologyStore((s) => s.setSelectedVlan)
+  const setSelectionVlan = useSelectionStore((s) => s.setSelectedVlan)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
   const highlightedNodeId = useTopologyStore((s) => s.highlightedNodeId)
@@ -20,6 +22,7 @@ function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     setSelectedVlan(vlan.id)
+    setSelectionVlan(vlan.id)
     if (!detailPanelOpen) toggleDetailPanel()
   }
 
@@ -61,8 +64,21 @@ function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
 export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
   const d = data as SiteNodeData
   const toggleExpandedSite = useTopologyStore((s) => s.toggleExpandedSite)
+  const setSelectedSite = useSelectionStore((s) => s.setSelectedSite)
+  const expandSite = useSelectionStore((s) => s.toggleExpandedSite)
+  const expandedSiteIds = useSelectionStore((s) => s.expandedSiteIds)
+  const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
+  const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
   const highlightedNodeId = useTopologyStore((s) => s.highlightedNodeId)
   const isHighlighted = highlightedNodeId === id
+
+  const handleSiteClick = () => {
+    toggleExpandedSite(d.siteId)
+    setSelectedSite(d.siteId)
+    // Also expand in sidebar if not already
+    if (!expandedSiteIds.has(d.siteId)) expandSite(d.siteId)
+    if (!detailPanelOpen) toggleDetailPanel()
+  }
 
   return (
     <div
@@ -74,12 +90,15 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
           : 'border-border hover:border-primary/50',
       )}
     >
-      <Handle type="target" position={Position.Top} className="!bg-primary !w-2 !h-2" />
+      <Handle type="target" id="target-top" position={Position.Top} className="!w-1.5 !h-1.5 !opacity-0" />
+      <Handle type="target" id="target-left" position={Position.Left} className="!w-1.5 !h-1.5 !opacity-0" />
+      <Handle type="source" id="source-top" position={Position.Top} className="!w-1.5 !h-1.5 !opacity-0" />
+      <Handle type="source" id="source-left" position={Position.Left} className="!w-1.5 !h-1.5 !opacity-0" />
 
       {/* Site header */}
       <div
         className="flex items-center gap-2 px-4 py-3 cursor-pointer"
-        onClick={() => toggleExpandedSite(d.siteId)}
+        onClick={handleSiteClick}
       >
         <Building2 className="h-5 w-5 text-primary shrink-0" />
         <div className="flex-1 min-w-0">
@@ -110,7 +129,10 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} className="!bg-primary !w-2 !h-2" />
+      <Handle type="target" id="target-bottom" position={Position.Bottom} className="!w-1.5 !h-1.5 !opacity-0" />
+      <Handle type="target" id="target-right" position={Position.Right} className="!w-1.5 !h-1.5 !opacity-0" />
+      <Handle type="source" id="source-bottom" position={Position.Bottom} className="!w-1.5 !h-1.5 !opacity-0" />
+      <Handle type="source" id="source-right" position={Position.Right} className="!w-1.5 !h-1.5 !opacity-0" />
     </div>
   )
 })
