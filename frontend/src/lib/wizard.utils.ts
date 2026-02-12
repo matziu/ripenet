@@ -83,6 +83,7 @@ export function buildVlanAlignedPlan(state: WizardState): WizardAddressEntry[] {
   // Align to /16 boundary
   const base16 = baseNum & 0xffff0000
   const subnetPrefix = state.vlanAlignedPrefix
+  const perSite = state.vlanNumbering === 'per-site'
 
   const plan: WizardAddressEntry[] = []
 
@@ -90,8 +91,9 @@ export function buildVlanAlignedPlan(state: WizardState): WizardAddressEntry[] {
     const site = state.sites[siteIdx]
     const overrides = state.perSiteOverrides[site.tempId] ?? []
 
-    // Each site gets a /16 block: base + siteIdx * 65536
-    const siteBaseNum = (base16 + (siteIdx << 16)) >>> 0
+    // Per-site unique VLAN IDs: all sites share the same /16 (IDs don't collide)
+    // Same VLAN IDs: each site gets a separate /16 block
+    const siteBaseNum = perSite ? base16 : (base16 + (siteIdx << 16)) >>> 0
 
     for (let i = 0; i < state.vlanTemplates.length; i++) {
       const tpl = state.vlanTemplates[i]
@@ -119,27 +121,40 @@ export function validateVlanAligned(state: WizardState): string[] {
   const errors: string[] = []
   if (!state.supernet.includes('/')) return ['Invalid supernet']
   const prefix = parseInt(state.supernet.split('/')[1], 10)
+  const perSite = state.vlanNumbering === 'per-site'
 
   if (prefix > 16) {
     errors.push('VLAN-aligned mode requires a supernet of /16 or larger')
   }
 
-  const available16Blocks = prefix <= 16 ? 1 << (16 - prefix) : 0
-  if (state.sites.length > available16Blocks) {
-    errors.push(
-      `Supernet /${prefix} provides ${available16Blocks} site block(s) (/16 each), but ${state.sites.length} sites are defined`,
-    )
+  if (!perSite) {
+    // Same VLAN IDs: each site needs its own /16 block
+    const available16Blocks = prefix <= 16 ? 1 << (16 - prefix) : 0
+    if (state.sites.length > available16Blocks) {
+      errors.push(
+        `With same VLAN IDs per site, supernet /${prefix} provides ${available16Blocks} /16 block(s), but ${state.sites.length} sites are defined. Use a larger supernet or switch to unique-per-site numbering.`,
+      )
+    }
   }
 
-  // Check all effective VLAN IDs (including per-site offsets) fit in a single octet
-  const maxSiteIdx = state.sites.length - 1
-  for (const tpl of state.vlanTemplates) {
-    const maxVlanId = getVlanIdForSite(tpl.vlanId, maxSiteIdx, state)
-    if (tpl.vlanId > 255 || maxVlanId > 255) {
-      errors.push(
-        `VLAN IDs must be 0–255 for 3rd-octet mapping. VLAN ${tpl.vlanId} at last site would be ${maxVlanId}`,
-      )
-      break
+  // Check all effective VLAN IDs fit in a single octet (0–255)
+  const usedOctets = new Set<number>()
+  for (let siteIdx = 0; siteIdx < state.sites.length; siteIdx++) {
+    for (const tpl of state.vlanTemplates) {
+      const vid = getVlanIdForSite(tpl.vlanId, siteIdx, state)
+      if (vid > 255 || vid < 0) {
+        errors.push(
+          `VLAN IDs must be 0–255 for 3rd-octet mapping. VLAN ${tpl.vlanId} at site ${siteIdx + 1} resolves to ${vid}`,
+        )
+        return errors
+      }
+      if (perSite && usedOctets.has(vid)) {
+        errors.push(
+          `Duplicate 3rd-octet value ${vid} across sites. Adjust VLAN IDs or site offset to avoid collisions.`,
+        )
+        return errors
+      }
+      usedOctets.add(vid)
     }
   }
 

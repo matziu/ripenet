@@ -149,7 +149,8 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
                 const parts = ipStr.split('.').map(Number)
                 const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
                 const base16 = baseNum & 0xffff0000
-                const siteNum = (base16 + (idx << 16)) >>> 0
+                const perSite = state.vlanNumbering === 'per-site'
+                const siteNum = perSite ? base16 : (base16 + (idx << 16)) >>> 0
                 const o1 = (siteNum >>> 24) & 0xff
                 const o2 = (siteNum >>> 16) & 0xff
                 const firstTpl = state.vlanTemplates[0]
