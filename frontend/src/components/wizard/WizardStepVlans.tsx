@@ -264,7 +264,7 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
                     <th className="px-3 py-2 text-left font-medium">Site</th>
                     {state.vlanTemplates.map((tpl) => (
                       <th key={tpl.tempId} className="px-3 py-2 text-left font-medium">
-                        {tpl.name || '(unnamed)'}
+                        {tpl.name ? `${tpl.name} (${tpl.vlanId})` : `VLAN ${tpl.vlanId}`}
                       </th>
                     ))}
                   </tr>
