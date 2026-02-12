@@ -77,8 +77,7 @@ export function buildAddressPlan(
  * VLAN ID maps to the 3rd octet → e.g. VLAN 100 = x.x.100.0/24
  */
 export function buildVlanAlignedPlan(state: WizardState): WizardAddressEntry[] {
-  const [ipStr, prefixStr] = state.supernet.split('/')
-  const prefix = parseInt(prefixStr, 10)
+  const [ipStr] = state.supernet.split('/')
   const parts = ipStr.split('.').map(Number)
   const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
   // Align to /16 boundary
