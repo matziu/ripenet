@@ -8,6 +8,15 @@ ALLOWED_HOSTS = ["*"]
 # CORS - allow all in development
 CORS_ALLOW_ALL_ORIGINS = True
 
+# CSRF - trust common dev origins; Vite proxy also rewrites Origin header
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+]
+CORS_ALLOW_CREDENTIALS = True
+
 # Debug toolbar
 INSTALLED_APPS += ["debug_toolbar"]  # noqa: F405
 MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")  # noqa: F405

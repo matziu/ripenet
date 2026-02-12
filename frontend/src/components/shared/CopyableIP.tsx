@@ -11,11 +11,28 @@ interface CopyableIPProps {
 export function CopyableIP({ ip, className }: CopyableIPProps) {
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(ip)
-    setCopied(true)
-    toast.success(`Copied: ${ip}`)
-    setTimeout(() => setCopied(false), 2000)
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(ip)
+      } else {
+        // Fallback for non-HTTPS contexts
+        const textarea = document.createElement('textarea')
+        textarea.value = ip
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setCopied(true)
+      toast.success(`Copied: ${ip}`)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Failed to copy')
+    }
   }
 
   return (

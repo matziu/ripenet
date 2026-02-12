@@ -28,9 +28,11 @@ services:
       dockerfile: ../docker/Dockerfile.backend
       args:
         REQUIREMENTS_FILE: requirements/dev.txt
+    entrypoint: /app-docker/entrypoint.dev.sh
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./backend:/app
+      - ./docker:/app-docker
     ports:
       - "8000:8000"
     environment:

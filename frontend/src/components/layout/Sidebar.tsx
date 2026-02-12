@@ -39,7 +39,12 @@ export function Sidebar({ className }: SidebarProps) {
     <aside className={cn('border-r border-border bg-card overflow-y-auto overflow-x-hidden', className)}>
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Projects</h2>
+          <button
+            onClick={() => navigate('/projects')}
+            className="text-xs font-semibold uppercase text-muted-foreground tracking-wider hover:text-foreground transition-colors"
+          >
+            Projects
+          </button>
           <button
             onClick={() => navigate('/projects')}
             className="p-1 rounded hover:bg-accent"
@@ -82,27 +87,41 @@ function ProjectTreeItem({
   onSelect: () => void
 }) {
   const [addSiteOpen, setAddSiteOpen] = useState(false)
+  const expanded = useSelectionStore((s) => s.expandedProjectIds.has(project.id))
+  const toggleExpanded = useSelectionStore((s) => s.toggleExpandedProject)
 
   const { data: sitesData } = useQuery({
     queryKey: ['sites', project.id],
     queryFn: () => sitesApi.list(project.id),
     select: (res) => res.data.results,
-    enabled: isActive,
+    enabled: isActive || expanded,
   })
 
   const sites = sitesData ?? []
+  const isExpanded = isActive && expanded
+
+  const handleClick = () => {
+    if (isActive) {
+      // Already on this project — just toggle expand/collapse
+      toggleExpanded(project.id)
+    } else {
+      // Navigate to project and auto-expand
+      onSelect()
+      if (!expanded) toggleExpanded(project.id)
+    }
+  }
 
   return (
     <div>
       <div className="group flex items-center">
         <button
-          onClick={onSelect}
+          onClick={handleClick}
           className={cn(
             'flex flex-1 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors min-w-0',
             isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
           )}
         >
-          {isActive ? (
+          {isExpanded ? (
             <ChevronDown className="h-3.5 w-3.5 shrink-0" />
           ) : (
             <ChevronRight className="h-3.5 w-3.5 shrink-0" />
@@ -122,7 +141,7 @@ function ProjectTreeItem({
         )}
       </div>
 
-      {isActive && sites.length > 0 && (
+      {isExpanded && sites.length > 0 && (
         <div className="ml-3 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
           {sites.map((site) => (
             <SiteTreeItem key={site.id} site={site} projectId={project.id} />

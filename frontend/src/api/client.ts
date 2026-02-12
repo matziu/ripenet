@@ -22,4 +22,24 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+// If a mutating request gets 403 and we have no CSRF token, fetch one and retry
+apiClient.interceptors.response.use(undefined, async (error) => {
+  const original = error.config
+  if (
+    error.response?.status === 403 &&
+    !original._csrfRetry &&
+    original.method !== 'get'
+  ) {
+    original._csrfRetry = true
+    // Hit the login endpoint with GET to obtain the CSRF cookie
+    await apiClient.get('/auth/login/')
+    const token = getCsrfToken()
+    if (token) {
+      original.headers['X-CSRFToken'] = token
+      return apiClient(original)
+    }
+  }
+  return Promise.reject(error)
+})
+
 export default apiClient

@@ -6,9 +6,11 @@ interface SelectionState {
   selectedVlanId: number | null
   selectedSubnetId: number | null
   selectedHostId: number | null
+  expandedProjectIds: Set<number>
   expandedSiteIds: Set<number>
   expandedVlanIds: Set<number>
   expandedSubnetIds: Set<number>
+  toggleExpandedProject: (id: number) => void
   setSelectedProject: (id: number | null) => void
   setSelectedSite: (id: number | null) => void
   setSelectedVlan: (id: number | null) => void
@@ -26,9 +28,15 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   selectedVlanId: null,
   selectedSubnetId: null,
   selectedHostId: null,
+  expandedProjectIds: new Set(),
   expandedSiteIds: new Set(),
   expandedVlanIds: new Set(),
   expandedSubnetIds: new Set(),
+  toggleExpandedProject: (id) => {
+    const next = new Set(get().expandedProjectIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    set({ expandedProjectIds: next })
+  },
   setSelectedProject: (id) => set({ selectedProjectId: id, selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null }),
   setSelectedSite: (id) => set({ selectedSiteId: id, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null }),
   setSelectedVlan: (id) => set({ selectedVlanId: id, selectedSubnetId: null, selectedHostId: null }),
