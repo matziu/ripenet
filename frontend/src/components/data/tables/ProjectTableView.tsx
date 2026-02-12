@@ -11,7 +11,7 @@ import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { cn } from '@/lib/utils'
-import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Building2, Network } from 'lucide-react'
 import type { TableTab } from '@/pages/ProjectPage'
 import type { Site, VLAN, Subnet, Host, Tunnel } from '@/types'
 
@@ -212,7 +212,7 @@ function VlansTable({ projectId }: { projectId: number }) {
               <tr className="bg-muted/40">
                 <td colSpan={5} className="px-3 py-1.5">
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                    <ChevronRight className="h-3 w-3" />
+                    <Building2 className="h-3 w-3" />
                     {site.name}
                     <span className="font-normal">({siteVlans.length})</span>
                   </span>
@@ -330,7 +330,7 @@ function SubnetsTable({ projectId }: { projectId: number }) {
               <tr className="bg-muted/40">
                 <td colSpan={4} className="px-3 py-1.5">
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                    <ChevronRight className="h-3 w-3" />
+                    <Network className="h-3 w-3" />
                     VLAN {vlan.vlan_id} &mdash; {vlan.name}
                     <span className="font-normal">({vlanSubnets.length})</span>
                   </span>
