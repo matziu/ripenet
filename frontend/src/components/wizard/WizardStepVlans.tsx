@@ -135,16 +135,14 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
                   ({preset.templates.length})
                 </span>
               </button>
-              {!preset.builtIn && (
-                <button
-                  type="button"
-                  onClick={() => handleDeletePreset(preset.id)}
-                  className="p-1 rounded hover:bg-destructive/10"
-                  title="Delete preset"
-                >
-                  <X className="h-3 w-3 text-muted-foreground" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => handleDeletePreset(preset.id)}
+                className="p-1 rounded hover:bg-destructive/10"
+                title="Delete preset"
+              >
+                <X className="h-3 w-3 text-muted-foreground" />
+              </button>
             </div>
           ))}
         </div>

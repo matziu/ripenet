@@ -299,11 +299,11 @@ export function tempId(): string {
 
 const STORAGE_KEY = 'ripe-net-vlan-presets'
 
-const BUILT_IN_PRESETS: VlanPreset[] = [
+const DEFAULT_PRESETS: VlanPreset[] = [
   {
-    id: 'builtin-office',
+    id: 'preset-office',
     name: 'Office',
-    builtIn: true,
+    builtIn: false,
     templates: [
       { vlanId: 10, name: 'Management', purpose: 'Network management', hostsNeeded: 10 },
       { vlanId: 20, name: 'Users', purpose: 'End-user workstations', hostsNeeded: 100 },
@@ -313,9 +313,9 @@ const BUILT_IN_PRESETS: VlanPreset[] = [
     ],
   },
   {
-    id: 'builtin-datacenter',
+    id: 'preset-datacenter',
     name: 'Data Center',
-    builtIn: true,
+    builtIn: false,
     templates: [
       { vlanId: 10, name: 'Management', purpose: 'Out-of-band management', hostsNeeded: 20 },
       { vlanId: 20, name: 'Servers', purpose: 'Production servers', hostsNeeded: 200 },
@@ -325,9 +325,9 @@ const BUILT_IN_PRESETS: VlanPreset[] = [
     ],
   },
   {
-    id: 'builtin-branch',
+    id: 'preset-branch',
     name: 'Branch',
-    builtIn: true,
+    builtIn: false,
     templates: [
       { vlanId: 10, name: 'Management', purpose: 'Network management', hostsNeeded: 5 },
       { vlanId: 20, name: 'Users', purpose: 'End-user devices', hostsNeeded: 30 },
@@ -336,26 +336,27 @@ const BUILT_IN_PRESETS: VlanPreset[] = [
   },
 ]
 
-export function loadCustomPresets(): VlanPreset[] {
+function loadPresets(): VlanPreset[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as VlanPreset[]) : []
-  } catch {
-    return []
-  }
+    if (raw) return JSON.parse(raw) as VlanPreset[]
+  } catch { /* ignore */ }
+  // First run: seed with defaults
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRESETS))
+  return [...DEFAULT_PRESETS]
 }
 
-export function saveCustomPresets(presets: VlanPreset[]): void {
+function savePresets(presets: VlanPreset[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
 }
 
 export function getAllPresets(): VlanPreset[] {
-  return [...BUILT_IN_PRESETS, ...loadCustomPresets()]
+  return loadPresets()
 }
 
 export function saveCurrentAsPreset(name: string, state: WizardState): VlanPreset {
   const preset: VlanPreset = {
-    id: 'custom-' + tempId(),
+    id: 'preset-' + tempId(),
     name,
     builtIn: false,
     templates: state.vlanTemplates.map(({ vlanId, name: n, purpose, hostsNeeded }) => ({
@@ -365,15 +366,15 @@ export function saveCurrentAsPreset(name: string, state: WizardState): VlanPrese
       hostsNeeded,
     })),
   }
-  const custom = loadCustomPresets()
-  custom.push(preset)
-  saveCustomPresets(custom)
+  const all = loadPresets()
+  all.push(preset)
+  savePresets(all)
   return preset
 }
 
 export function deleteCustomPreset(id: string): void {
-  const custom = loadCustomPresets().filter((p) => p.id !== id)
-  saveCustomPresets(custom)
+  const remaining = loadPresets().filter((p) => p.id !== id)
+  savePresets(remaining)
 }
 
 // ---------------------------------------------------------------------------
