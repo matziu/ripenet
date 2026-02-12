@@ -8,6 +8,7 @@ import {
   buildVlanAlignedPlan,
   validateVlanAligned,
   computeSubnetDetails,
+  getVlanIdForSite,
 } from '@/lib/wizard.utils'
 
 interface Props {
@@ -62,9 +63,13 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
 
   const getSiteName = (tempId: string) =>
     state.sites.find((s) => s.tempId === tempId)?.name ?? tempId
-  const getVlanName = (tempId: string) => {
-    const tpl = state.vlanTemplates.find((t) => t.tempId === tempId)
-    return tpl ? `VLAN ${tpl.vlanId} - ${tpl.name}` : tempId
+  const getSiteIndex = (tempId: string) =>
+    state.sites.findIndex((s) => s.tempId === tempId)
+  const getVlanLabel = (vlanTempId: string, siteTempId: string) => {
+    const tpl = state.vlanTemplates.find((t) => t.tempId === vlanTempId)
+    if (!tpl) return vlanTempId
+    const vid = getVlanIdForSite(tpl.vlanId, getSiteIndex(siteTempId), state)
+    return `VLAN ${vid} - ${tpl.name}`
   }
 
   // Build lookup for VLSM host counts
@@ -135,10 +140,10 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
             </select>
           </div>
 
-          {/* Show site block assignments */}
-          {alignedErrors.length === 0 && (
+          {/* Show site block assignments with example VLAN IDs */}
+          {alignedErrors.length === 0 && state.vlanTemplates.length > 0 && (
             <div className="text-xs text-muted-foreground space-y-0.5">
-              <span className="font-medium">Site blocks:</span>
+              <span className="font-medium">Addressing scheme:</span>
               {state.sites.map((site, idx) => {
                 const [ipStr] = state.supernet.split('/')
                 const parts = ipStr.split('.').map(Number)
@@ -147,9 +152,12 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
                 const siteNum = (base16 + (idx << 16)) >>> 0
                 const o1 = (siteNum >>> 24) & 0xff
                 const o2 = (siteNum >>> 16) & 0xff
+                const firstTpl = state.vlanTemplates[0]
+                const vid = getVlanIdForSite(firstTpl.vlanId, idx, state)
                 return (
                   <div key={site.tempId} className="font-mono">
-                    {site.name}: {o1}.{o2}.&#123;VLAN ID&#125;.0/{state.vlanAlignedPrefix}
+                    {site.name}: {o1}.{o2}.&#123;VID&#125;.0/{state.vlanAlignedPrefix}
+                    {' '}(e.g. VLAN {vid} → {o1}.{o2}.{vid & 0xff}.0)
                   </div>
                 )
               })}
@@ -225,7 +233,7 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
                 return (
                   <tr key={idx} className="border-b border-border">
                     <td className="px-3 py-2">{siteName}</td>
-                    <td className="px-3 py-2">{getVlanName(entry.vlanTempId)}</td>
+                    <td className="px-3 py-2">{getVlanLabel(entry.vlanTempId, entry.siteTempId)}</td>
                     <td className="px-3 py-2 font-mono text-xs">{entry.subnet}</td>
                     <td className="px-3 py-2 font-mono text-xs">{details.gateway}</td>
                     <td className="px-3 py-2 font-mono text-xs">{details.hostMin}</td>

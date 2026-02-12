@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, Settings2 } from 'lucide-react'
 import type { WizardState, WizardSiteOverride } from '@/lib/wizard.types'
-import { tempId } from '@/lib/wizard.utils'
+import { tempId, getVlanIdForSite } from '@/lib/wizard.utils'
 
 interface Props {
   state: WizardState
@@ -13,11 +13,24 @@ interface Props {
 export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
   const [showOverrides, setShowOverrides] = useState(false)
 
+  /** Re-number all template VLAN IDs from current start/step */
+  const applyAutoNumber = (start: number, step: number) => {
+    onChange({
+      vlanStartId: start,
+      vlanStep: step,
+      vlanTemplates: state.vlanTemplates.map((t, i) => ({
+        ...t,
+        vlanId: start + i * step,
+      })),
+    })
+  }
+
   const addTemplate = () => {
+    const nextVlanId = state.vlanStartId + state.vlanTemplates.length * state.vlanStep
     onChange({
       vlanTemplates: [
         ...state.vlanTemplates,
-        { tempId: tempId(), vlanId: (state.vlanTemplates.length + 1) * 10, name: '', purpose: '', hostsNeeded: 10 },
+        { tempId: tempId(), vlanId: nextVlanId, name: '', purpose: '', hostsNeeded: 10 },
       ],
     })
   }
@@ -41,7 +54,6 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
     if (!current[siteTempId]) {
       current[siteTempId] = state.vlanTemplates.map(() => ({}))
     }
-    // Extend if template list grew
     while (current[siteTempId].length < state.vlanTemplates.length) {
       current[siteTempId].push({})
     }
@@ -59,6 +71,8 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
     state.vlanTemplates.length >= 1 &&
     state.vlanTemplates.every((t) => t.name.trim() !== '' && t.hostsNeeded > 0)
 
+  const isPerSite = state.vlanNumbering === 'per-site'
+
   return (
     <div className="space-y-6">
       <div>
@@ -69,12 +83,109 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
         </p>
       </div>
 
+      {/* VLAN Numbering Config */}
+      <div className="rounded-md border border-border p-4 space-y-3">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          VLAN Numbering
+        </h3>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => onChange({ vlanNumbering: 'same' })}
+            className={`flex-1 rounded-md border px-3 py-2 text-sm text-left transition-colors ${
+              !isPerSite
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border hover:bg-accent'
+            }`}
+          >
+            <div className="font-medium">Same per site</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              All sites share VLAN IDs (e.g. VLAN 10, 20, 30)
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ vlanNumbering: 'per-site' })}
+            className={`flex-1 rounded-md border px-3 py-2 text-sm text-left transition-colors ${
+              isPerSite
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border hover:bg-accent'
+            }`}
+          >
+            <div className="font-medium">Unique per site</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Each site gets offset IDs (e.g. Site 1: 100, Site 2: 200)
+            </div>
+          </button>
+        </div>
+
+        <div className={`grid gap-3 ${isPerSite ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div>
+            <label className="text-xs font-medium">Start ID</label>
+            <input
+              type="number"
+              min={1}
+              value={state.vlanStartId}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10) || 1
+                applyAutoNumber(v, state.vlanStep)
+              }}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium">Step</label>
+            <input
+              type="number"
+              min={1}
+              value={state.vlanStep}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10) || 1
+                applyAutoNumber(state.vlanStartId, v)
+              }}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
+            />
+          </div>
+          {isPerSite && (
+            <div>
+              <label className="text-xs font-medium">Site Offset</label>
+              <input
+                type="number"
+                min={1}
+                value={state.vlanSiteOffset}
+                onChange={(e) => onChange({ vlanSiteOffset: parseInt(e.target.value, 10) || 1 })}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Preview per-site numbering */}
+        {isPerSite && state.sites.length > 0 && state.vlanTemplates.length > 0 && (
+          <div className="text-xs text-muted-foreground space-y-0.5 pt-1">
+            <span className="font-medium">Preview:</span>
+            {state.sites.map((site, siteIdx) => (
+              <div key={site.tempId} className="font-mono">
+                {site.name}:{' '}
+                {state.vlanTemplates.map((tpl, i) => (
+                  <span key={tpl.tempId}>
+                    {i > 0 && ', '}
+                    VLAN {getVlanIdForSite(tpl.vlanId, siteIdx, state)}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Templates list */}
       <div className="space-y-3">
         {state.vlanTemplates.map((tpl) => (
           <div key={tpl.tempId} className="rounded-md border border-border p-3 space-y-2">
             <div className="grid grid-cols-4 gap-2">
               <div>
-                <label className="text-xs font-medium">VLAN ID</label>
+                <label className="text-xs font-medium">Base VLAN ID</label>
                 <input
                   type="number"
                   value={tpl.vlanId}

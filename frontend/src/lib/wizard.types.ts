@@ -63,6 +63,10 @@ export interface WizardState {
   // Step 3: VLAN Template
   vlanTemplates: WizardVlanTemplate[]
   perSiteOverrides: Record<string, WizardSiteOverride[]>
+  vlanNumbering: 'same' | 'per-site'
+  vlanStartId: number
+  vlanStep: number
+  vlanSiteOffset: number      // per-site mode: offset between sites (e.g. 100)
 
   // Step 4: Address Plan
   addressingMode: 'vlsm' | 'vlan-aligned'
@@ -86,6 +90,10 @@ export const initialWizardState: WizardState = {
   sites: [],
   vlanTemplates: [],
   perSiteOverrides: {},
+  vlanNumbering: 'same',
+  vlanStartId: 10,
+  vlanStep: 10,
+  vlanSiteOffset: 100,
   addressingMode: 'vlsm',
   vlanAlignedPrefix: 24,
   addressPlan: [],

@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { projectsApi, sitesApi, vlansApi, subnetsApi, tunnelsApi } from '@/api/endpoints'
 import type { WizardState } from '@/lib/wizard.types'
+import { getVlanIdForSite } from '@/lib/wizard.utils'
 
 interface Props {
   state: WizardState
@@ -75,7 +76,7 @@ export function WizardStepReview({ state, onBack }: Props) {
         setProgress({ phase: 'sites', current: i + 1, total: state.sites.length })
       }
 
-      // 3. VLANs — group address plan by site+vlan
+      // 3. VLANs — use per-site VLAN IDs
       const vlanIdMap = new Map<string, number>() // key: "siteTempId:vlanTempId"
       const vlanEntries = state.addressPlan
       setProgress({ phase: 'vlans', current: 0, total: vlanEntries.length })
@@ -83,9 +84,11 @@ export function WizardStepReview({ state, onBack }: Props) {
         const entry = vlanEntries[i]
         const realSiteId = siteIdMap.get(entry.siteTempId)!
         const tpl = getVlanTemplate(entry.vlanTempId)!
+        const siteIdx = state.sites.findIndex((s) => s.tempId === entry.siteTempId)
+        const effectiveVlanId = getVlanIdForSite(tpl.vlanId, siteIdx, state)
         const res = await vlansApi.create({
           site: realSiteId,
-          vlan_id: tpl.vlanId,
+          vlan_id: effectiveVlanId,
           name: tpl.name,
           purpose: tpl.purpose,
         })
@@ -187,6 +190,7 @@ export function WizardStepReview({ state, onBack }: Props) {
           </h3>
           <div className="space-y-1 text-sm">
             {state.sites.map((site) => {
+              const siteIdx = state.sites.indexOf(site)
               const siteEntries = state.addressPlan.filter((e) => e.siteTempId === site.tempId)
               if (siteEntries.length === 0) return null
               return (
@@ -194,10 +198,11 @@ export function WizardStepReview({ state, onBack }: Props) {
                   <span className="font-medium">{site.name}:</span>{' '}
                   {siteEntries.map((e, i) => {
                     const tpl = getVlanTemplate(e.vlanTempId)
+                    const vid = tpl ? getVlanIdForSite(tpl.vlanId, siteIdx, state) : '?'
                     return (
                       <span key={i} className="text-muted-foreground">
                         {i > 0 && ', '}
-                        {tpl?.name} <span className="font-mono text-xs">{e.subnet}</span>
+                        VLAN {vid} {tpl?.name} <span className="font-mono text-xs">{e.subnet}</span>
                       </span>
                     )
                   })}

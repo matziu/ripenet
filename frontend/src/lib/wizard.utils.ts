@@ -6,6 +6,16 @@ import type {
   VLSMAllocation,
 } from './wizard.types'
 
+/** Compute the effective VLAN ID for a given template at a given site index */
+export function getVlanIdForSite(
+  baseVlanId: number,
+  siteIndex: number,
+  state: WizardState,
+): number {
+  if (state.vlanNumbering === 'same') return baseVlanId
+  return baseVlanId + siteIndex * state.vlanSiteOffset
+}
+
 /** Build the VLSM requirements array from sites + templates + overrides */
 export function buildVlsmRequirements(state: WizardState) {
   const requirements: { name: string; hosts: number }[] = []
@@ -89,8 +99,9 @@ export function buildVlanAlignedPlan(state: WizardState): WizardAddressEntry[] {
       const override = overrides[i]
       if (override?.skip) continue
 
-      // VLAN ID in 3rd octet
-      const subnetNum = ((siteBaseNum & 0xffff0000) | ((tpl.vlanId & 0xff) << 8)) >>> 0
+      // Use per-site VLAN ID in 3rd octet
+      const effectiveVlanId = getVlanIdForSite(tpl.vlanId, siteIdx, state)
+      const subnetNum = ((siteBaseNum & 0xffff0000) | ((effectiveVlanId & 0xff) << 8)) >>> 0
       const subnet = numToIp(subnetNum) + '/' + subnetPrefix
       plan.push({
         siteTempId: site.tempId,
@@ -121,11 +132,16 @@ export function validateVlanAligned(state: WizardState): string[] {
     )
   }
 
-  const overflowing = state.vlanTemplates.filter((t) => t.vlanId > 255)
-  if (overflowing.length > 0) {
-    errors.push(
-      `VLAN IDs must be 0–255 for 3rd-octet mapping. Problem: ${overflowing.map((t) => `VLAN ${t.vlanId}`).join(', ')}`,
-    )
+  // Check all effective VLAN IDs (including per-site offsets) fit in a single octet
+  const maxSiteIdx = state.sites.length - 1
+  for (const tpl of state.vlanTemplates) {
+    const maxVlanId = getVlanIdForSite(tpl.vlanId, maxSiteIdx, state)
+    if (tpl.vlanId > 255 || maxVlanId > 255) {
+      errors.push(
+        `VLAN IDs must be 0–255 for 3rd-octet mapping. VLAN ${tpl.vlanId} at last site would be ${maxVlanId}`,
+      )
+      break
+    }
   }
 
   return errors
