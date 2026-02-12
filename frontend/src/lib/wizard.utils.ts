@@ -199,14 +199,15 @@ export function generateFullMeshTunnels(
   sites: WizardState['sites'],
   tunnelSubnetBase: string,
   tunnelType: string,
+  ptp: 30 | 31 = 30,
 ): WizardTunnelEntry[] {
   const pairs: WizardTunnelEntry[] = []
-  const thirtySlots = generateSlash30s(tunnelSubnetBase)
+  const slots = generatePointToPointSlots(tunnelSubnetBase, ptp)
   let slotIdx = 0
 
   for (let i = 0; i < sites.length; i++) {
     for (let j = i + 1; j < sites.length; j++) {
-      const slot = thirtySlots[slotIdx]
+      const slot = slots[slotIdx]
       if (!slot) break
       pairs.push({
         siteATempId: sites[i].tempId,
@@ -229,16 +230,17 @@ export function generateHubSpokeTunnels(
   hubTempId: string,
   tunnelSubnetBase: string,
   tunnelType: string,
+  ptp: 30 | 31 = 30,
 ): WizardTunnelEntry[] {
   const pairs: WizardTunnelEntry[] = []
-  const thirtySlots = generateSlash30s(tunnelSubnetBase)
+  const slots = generatePointToPointSlots(tunnelSubnetBase, ptp)
   const hub = sites.find((s) => s.tempId === hubTempId)
   if (!hub) return pairs
 
   let slotIdx = 0
   for (const site of sites) {
     if (site.tempId === hubTempId) continue
-    const slot = thirtySlots[slotIdx]
+    const slot = slots[slotIdx]
     if (!slot) break
     pairs.push({
       siteATempId: hub.tempId,
@@ -254,32 +256,45 @@ export function generateHubSpokeTunnels(
   return pairs
 }
 
-/** Split a CIDR block into /30 subnets for point-to-point links */
-function generateSlash30s(cidr: string): { subnet: string; ipA: string; ipB: string }[] {
+/** Split a CIDR block into point-to-point subnets (/30 or /31) */
+export function generatePointToPointSlots(
+  cidr: string,
+  ptp: 30 | 31 = 30,
+): { subnet: string; ipA: string; ipB: string }[] {
   if (!cidr || !cidr.includes('/')) return []
 
   const [ip, prefixStr] = cidr.split('/')
   const prefix = parseInt(prefixStr, 10)
-  if (prefix > 30) return []
+  if (prefix > ptp) return []
 
   const parts = ip.split('.').map(Number)
   const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
   const totalAddresses = 1 << (32 - prefix)
+  const step = ptp === 31 ? 2 : 4
   const slots: { subnet: string; ipA: string; ipB: string }[] = []
 
-  for (let offset = 0; offset < totalAddresses; offset += 4) {
+  for (let offset = 0; offset < totalAddresses; offset += step) {
     const netNum = baseNum + offset
-    slots.push({
-      subnet: numToIp(netNum) + '/30',
-      ipA: numToIp(netNum + 1),
-      ipB: numToIp(netNum + 2),
-    })
+    if (ptp === 31) {
+      // RFC 3021: /31 uses .0 and .1 directly
+      slots.push({
+        subnet: numToIp(netNum) + '/31',
+        ipA: numToIp(netNum),
+        ipB: numToIp(netNum + 1),
+      })
+    } else {
+      slots.push({
+        subnet: numToIp(netNum) + '/30',
+        ipA: numToIp(netNum + 1),
+        ipB: numToIp(netNum + 2),
+      })
+    }
   }
 
   return slots
 }
 
-function numToIp(num: number): string {
+export function numToIp(num: number): string {
   return [
     (num >>> 24) & 0xff,
     (num >>> 16) & 0xff,
@@ -522,10 +537,78 @@ export function validateSiteInOctet(state: WizardState): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Tunnel Auto-Sizing
+// ---------------------------------------------------------------------------
+
+/** Compute number of tunnels needed for the given topology mode */
+export function computeTunnelCount(
+  sites: WizardState['sites'],
+  mode: WizardState['tunnelMode'],
+): number {
+  const n = sites.length
+  if (mode === 'full-mesh') return (n * (n - 1)) / 2
+  if (mode === 'hub-spoke') return Math.max(0, n - 1)
+  return 0
+}
+
+/** Compute the smallest CIDR prefix that fits the given tunnel count */
+export function computeMinTunnelBlock(tunnelCount: number, ptp: 30 | 31): number {
+  if (tunnelCount <= 0) return ptp
+  const addressesPerTunnel = ptp === 31 ? 2 : 4
+  const totalNeeded = tunnelCount * addressesPerTunnel
+  // Find smallest power-of-2 block that fits
+  let bits = 0
+  while ((1 << bits) < totalNeeded) bits++
+  return 32 - bits
+}
+
+/** Suggest a CIDR block for tunnel addressing */
+export function suggestTunnelBlock(
+  supernet: string,
+  tunnelCount: number,
+  ptp: 30 | 31,
+  allocMode: WizardState['tunnelAllocMode'],
+): string {
+  if (tunnelCount <= 0 || !supernet || !supernet.includes('/')) return ''
+  const minPrefix = computeMinTunnelBlock(tunnelCount, ptp)
+  const blockSize = 1 << (32 - minPrefix)
+
+  if (allocMode === 'from-supernet') {
+    // Carve from the end of the supernet
+    const [ipStr, prefixStr] = supernet.split('/')
+    const superPrefix = parseInt(prefixStr, 10)
+    if (minPrefix < superPrefix) return '' // block won't fit
+    const superBase = ipToNum(ipStr)
+    const superSize = 1 << (32 - superPrefix)
+    const superEnd = (superBase + superSize) >>> 0
+    const tunnelBase = (superEnd - blockSize) >>> 0
+    return numToIp(tunnelBase) + '/' + minPrefix
+  }
+
+  if (allocMode === 'separate') {
+    // Pick from a different RFC1918 range
+    const firstOctet = parseInt(supernet.split('.')[0], 10)
+    if (firstOctet === 10) {
+      // Supernet in 10.x → use 172.16.0.0/X
+      return '172.16.0.0/' + minPrefix
+    }
+    if (firstOctet === 172) {
+      // Supernet in 172.x → use 10.255.255.X from the end of 10/8
+      const base = (ipToNum('10.255.255.252') - blockSize + 4) >>> 0
+      return numToIp(base) + '/' + minPrefix
+    }
+    // 192.168.x → use 172.16.0.0/X
+    return '172.16.0.0/' + minPrefix
+  }
+
+  return ''
+}
+
+// ---------------------------------------------------------------------------
 // Route Summarization
 // ---------------------------------------------------------------------------
 
-function ipToNum(ip: string): number {
+export function ipToNum(ip: string): number {
   const parts = ip.split('.').map(Number)
   return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
 }

@@ -95,6 +95,8 @@ export interface WizardState {
   tunnelMode: 'none' | 'full-mesh' | 'hub-spoke'
   tunnelType: TunnelType
   hubSiteTempId?: string
+  tunnelAllocMode: 'from-supernet' | 'separate' | 'manual'
+  tunnelPointToPointPrefix: 30 | 31
   tunnelSubnetBase: string
   tunnelPlan: WizardTunnelEntry[]
 }
@@ -117,6 +119,8 @@ export const initialWizardState: WizardState = {
   addressPlan: [],
   tunnelMode: 'none',
   tunnelType: 'wireguard',
+  tunnelAllocMode: 'from-supernet',
+  tunnelPointToPointPrefix: 30,
   tunnelSubnetBase: '',
   tunnelPlan: [],
 }
