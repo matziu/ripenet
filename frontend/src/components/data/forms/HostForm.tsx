@@ -6,7 +6,8 @@ import { toast } from 'sonner'
 import type { Host } from '@/types'
 
 interface HostFormProps {
-  subnetId: number
+  subnetId?: number
+  projectId?: number
   host?: Host
   onClose: () => void
 }
@@ -18,11 +19,23 @@ interface FormValues {
   status: string
   device_type: string
   description: string
+  subnet: string
 }
 
-export function HostForm({ subnetId, host, onClose }: HostFormProps) {
+export function HostForm({ subnetId, projectId, host, onClose }: HostFormProps) {
   const queryClient = useQueryClient()
-  const { register, handleSubmit, setValue } = useForm<FormValues>({
+  const needsSubnetSelector = !subnetId && !host
+
+  const { data: subnets } = useQuery({
+    queryKey: ['subnets', { project: projectId }],
+    queryFn: () => subnetsApi.list({ project: String(projectId!) }),
+    select: (res) => res.data.results,
+    enabled: needsSubnetSelector && !!projectId,
+  })
+
+  const resolvedSubnetId = subnetId ?? (host ? host.subnet : undefined)
+
+  const { register, handleSubmit, setValue, watch } = useForm<FormValues>({
     defaultValues: host ? {
       ip_address: host.ip_address,
       hostname: host.hostname,
@@ -30,18 +43,23 @@ export function HostForm({ subnetId, host, onClose }: HostFormProps) {
       status: host.status,
       device_type: host.device_type,
       description: host.description,
+      subnet: String(host.subnet),
     } : {
       status: 'planned',
       device_type: 'other',
+      subnet: subnetId ? String(subnetId) : '',
     },
   })
 
+  const selectedSubnet = watch('subnet')
+  const effectiveSubnetId = resolvedSubnetId ?? (selectedSubnet ? parseInt(selectedSubnet, 10) : undefined)
+
   // Suggest next free IP
   const { data: nextFreeIp } = useQuery({
-    queryKey: ['nextFreeIp', subnetId],
-    queryFn: () => subnetsApi.nextFreeIp(subnetId),
+    queryKey: ['nextFreeIp', effectiveSubnetId],
+    queryFn: () => subnetsApi.nextFreeIp(effectiveSubnetId!),
     select: (res) => res.data.next_free_ip,
-    enabled: !host,
+    enabled: !host && !!effectiveSubnetId,
   })
 
   useEffect(() => {
@@ -52,7 +70,16 @@ export function HostForm({ subnetId, host, onClose }: HostFormProps) {
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
-      const payload = { ...data, subnet: subnetId } as Record<string, unknown>
+      const finalSubnetId = subnetId ?? parseInt(data.subnet, 10)
+      const payload = {
+        ip_address: data.ip_address,
+        hostname: data.hostname,
+        mac_address: data.mac_address,
+        status: data.status,
+        device_type: data.device_type,
+        description: data.description,
+        subnet: finalSubnetId,
+      } as Record<string, unknown>
       return host
         ? hostsApi.update(host.id, payload as Partial<Host>)
         : hostsApi.create(payload as Partial<Host>)
@@ -71,6 +98,21 @@ export function HostForm({ subnetId, host, onClose }: HostFormProps) {
 
   return (
     <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-3">
+      {needsSubnetSelector && (
+        <div>
+          <label className="text-xs font-medium">Subnet</label>
+          <select
+            {...register('subnet', { required: 'Subnet is required' })}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+          >
+            <option value="">Choose subnet...</option>
+            {subnets?.map((s) => (
+              <option key={s.id} value={s.id}>{s.network}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div>
         <label className="text-xs font-medium">IP Address</label>
         <input

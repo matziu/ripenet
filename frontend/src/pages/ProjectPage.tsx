@@ -1,7 +1,6 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { projectsApi } from '@/api/endpoints'
-import { useUIStore } from '@/stores/ui.store'
 import { TopologyCanvas } from '@/components/topology/TopologyCanvas'
 import { GeoMap } from '@/components/geo/GeoMap'
 import { ProjectTableView } from '@/components/data/tables/ProjectTableView'
@@ -9,11 +8,28 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { useEffect } from 'react'
 import { useSelectionStore } from '@/stores/selection.store'
 
+const TAB_NAMES = ['sites', 'vlans', 'subnets', 'hosts', 'tunnels'] as const
+export type TableTab = (typeof TAB_NAMES)[number]
+
+function parseWildcard(wildcard: string | undefined) {
+  if (!wildcard) return { view: 'topology' as const, tab: undefined }
+  const parts = wildcard.split('/')
+  const view = parts[0] as 'topology' | 'geo' | 'table'
+  if (view === 'table') {
+    const tab = parts[1] as TableTab | undefined
+    return { view, tab: tab && TAB_NAMES.includes(tab) ? tab : undefined }
+  }
+  if (view === 'topology' || view === 'geo') return { view, tab: undefined }
+  return { view: undefined, tab: undefined }
+}
+
 export function ProjectPage() {
-  const { projectId } = useParams<{ projectId: string }>()
+  const { projectId, '*': wildcard } = useParams<{ projectId: string; '*': string }>()
   const id = Number(projectId)
-  const viewMode = useUIStore((s) => s.viewMode)
+  const navigate = useNavigate()
   const setSelectedProject = useSelectionStore((s) => s.setSelectedProject)
+
+  const { view, tab } = parseWildcard(wildcard)
 
   useEffect(() => {
     setSelectedProject(id)
@@ -28,16 +44,24 @@ export function ProjectPage() {
 
   // Keyboard shortcuts for view switching
   useEffect(() => {
-    const setViewMode = useUIStore.getState().setViewMode
     const handleKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.key === '1') setViewMode('topology')
-      else if (e.key === '2') setViewMode('geo')
-      else if (e.key === '3') setViewMode('table')
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
+      if (e.key === '1') navigate(`/projects/${id}/topology`, { replace: true })
+      else if (e.key === '2') navigate(`/projects/${id}/geo`, { replace: true })
+      else if (e.key === '3') navigate(`/projects/${id}/table/hosts`, { replace: true })
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [])
+  }, [id, navigate])
+
+  // Redirect bare /projects/:id to /projects/:id/topology
+  if (!view) {
+    return <Navigate to={`/projects/${id}/topology`} replace />
+  }
+  // Redirect /projects/:id/table to /projects/:id/table/hosts
+  if (view === 'table' && !tab) {
+    return <Navigate to={`/projects/${id}/table/hosts`} replace />
+  }
 
   if (!project) {
     return (
@@ -65,9 +89,9 @@ export function ProjectPage() {
 
       {/* Main view */}
       <div className="flex-1 overflow-hidden">
-        {viewMode === 'topology' && <TopologyCanvas projectId={id} />}
-        {viewMode === 'geo' && <GeoMap projectId={id} />}
-        {viewMode === 'table' && <ProjectTableView projectId={id} />}
+        {view === 'topology' && <TopologyCanvas projectId={id} />}
+        {view === 'geo' && <GeoMap projectId={id} />}
+        {view === 'table' && tab && <ProjectTableView projectId={id} activeTab={tab} />}
       </div>
     </div>
   )

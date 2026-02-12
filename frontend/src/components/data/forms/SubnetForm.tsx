@@ -1,11 +1,12 @@
 import { useForm } from 'react-hook-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { subnetsApi } from '@/api/endpoints'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { subnetsApi, vlansApi } from '@/api/endpoints'
 import { toast } from 'sonner'
 import type { Subnet } from '@/types'
 
 interface SubnetFormProps {
-  vlanId: number
+  vlanId?: number
+  projectId?: number
   subnet?: Subnet
   onClose: () => void
 }
@@ -14,18 +15,29 @@ interface FormValues {
   network: string
   gateway: string
   description: string
+  vlan: string
 }
 
-export function SubnetForm({ vlanId, subnet, onClose }: SubnetFormProps) {
+export function SubnetForm({ vlanId, projectId, subnet, onClose }: SubnetFormProps) {
   const queryClient = useQueryClient()
+  const needsVlanSelector = !vlanId && !subnet
+
+  const { data: vlans } = useQuery({
+    queryKey: ['vlans', { project: projectId }],
+    queryFn: () => vlansApi.list({ project: String(projectId!) }),
+    select: (res) => res.data.results,
+    enabled: needsVlanSelector && !!projectId,
+  })
 
   const { register, handleSubmit, watch, setValue } = useForm<FormValues>({
     defaultValues: subnet ? {
       network: subnet.network,
       gateway: subnet.gateway ?? '',
       description: subnet.description,
+      vlan: String(subnet.vlan),
     } : {
       gateway: '',
+      vlan: vlanId ? String(vlanId) : '',
     },
   })
 
@@ -42,10 +54,12 @@ export function SubnetForm({ vlanId, subnet, onClose }: SubnetFormProps) {
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
+      const resolvedVlanId = vlanId ?? parseInt(data.vlan, 10)
       const payload = {
-        ...data,
-        vlan: vlanId,
+        network: data.network,
         gateway: data.gateway || null,
+        description: data.description,
+        vlan: resolvedVlanId,
       }
       return subnet
         ? subnetsApi.update(subnet.id, payload)
@@ -68,6 +82,21 @@ export function SubnetForm({ vlanId, subnet, onClose }: SubnetFormProps) {
 
   return (
     <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-3">
+      {needsVlanSelector && (
+        <div>
+          <label className="text-xs font-medium">VLAN</label>
+          <select
+            {...register('vlan', { required: 'VLAN is required' })}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+          >
+            <option value="">Choose VLAN...</option>
+            {vlans?.map((v) => (
+              <option key={v.id} value={v.id}>{v.name} (VLAN {v.vlan_id})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div>
         <label className="text-xs font-medium">Network (CIDR)</label>
         <input

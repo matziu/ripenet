@@ -1,11 +1,12 @@
 import { useForm } from 'react-hook-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { vlansApi } from '@/api/endpoints'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { vlansApi, sitesApi } from '@/api/endpoints'
 import { toast } from 'sonner'
 import type { VLAN } from '@/types'
 
 interface VlanFormProps {
-  siteId: number
+  siteId?: number
+  projectId?: number
   vlan?: VLAN
   onClose: () => void
 }
@@ -15,10 +16,19 @@ interface FormValues {
   name: string
   purpose: string
   description: string
+  site: string
 }
 
-export function VlanForm({ siteId, vlan, onClose }: VlanFormProps) {
+export function VlanForm({ siteId, projectId, vlan, onClose }: VlanFormProps) {
   const queryClient = useQueryClient()
+  const needsSiteSelector = !siteId && !vlan
+
+  const { data: sites } = useQuery({
+    queryKey: ['sites', projectId],
+    queryFn: () => sitesApi.list(projectId!),
+    select: (res) => res.data.results,
+    enabled: needsSiteSelector && !!projectId,
+  })
 
   const { register, handleSubmit } = useForm<FormValues>({
     defaultValues: vlan ? {
@@ -26,17 +36,21 @@ export function VlanForm({ siteId, vlan, onClose }: VlanFormProps) {
       name: vlan.name,
       purpose: vlan.purpose,
       description: vlan.description,
-    } : {},
+      site: String(vlan.site),
+    } : {
+      site: siteId ? String(siteId) : '',
+    },
   })
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
+      const resolvedSiteId = siteId ?? parseInt(data.site, 10)
       const payload = {
         vlan_id: parseInt(data.vlan_id, 10),
         name: data.name,
         purpose: data.purpose,
         description: data.description,
-        site: siteId,
+        site: resolvedSiteId,
       }
       return vlan
         ? vlansApi.update(vlan.id, payload)
@@ -59,6 +73,21 @@ export function VlanForm({ siteId, vlan, onClose }: VlanFormProps) {
 
   return (
     <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-3">
+      {needsSiteSelector && (
+        <div>
+          <label className="text-xs font-medium">Site</label>
+          <select
+            {...register('site', { required: 'Site is required' })}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+          >
+            <option value="">Choose site...</option>
+            {sites?.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium">VLAN ID</label>

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { BaseEdge, getBezierPath, EdgeLabelRenderer } from '@xyflow/react'
 import type { EdgeProps } from '@xyflow/react'
 import type { TunnelEdgeData } from '@/lib/topology.utils'
-import { cn } from '@/lib/utils'
+
 
 const tunnelTypeColors: Record<string, string> = {
   wireguard: '#8b5cf6',
