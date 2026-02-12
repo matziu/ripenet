@@ -76,7 +76,7 @@ export function WizardStepReview({ state, onBack }: Props) {
         setProgress({ phase: 'sites', current: i + 1, total: state.sites.length })
       }
 
-      // 3. VLANs — use per-site VLAN IDs
+      // 3. VLANs — use per-site VLAN IDs + name overrides
       const vlanIdMap = new Map<string, number>() // key: "siteTempId:vlanTempId"
       const vlanEntries = state.addressPlan
       setProgress({ phase: 'vlans', current: 0, total: vlanEntries.length })
@@ -85,11 +85,13 @@ export function WizardStepReview({ state, onBack }: Props) {
         const realSiteId = siteIdMap.get(entry.siteTempId)!
         const tpl = getVlanTemplate(entry.vlanTempId)!
         const siteIdx = state.sites.findIndex((s) => s.tempId === entry.siteTempId)
+        const tplIdx = state.vlanTemplates.findIndex((t) => t.tempId === entry.vlanTempId)
+        const override = state.perSiteOverrides[entry.siteTempId]?.[tplIdx]
         const effectiveVlanId = getVlanIdForSite(tpl.vlanId, siteIdx, state)
         const res = await vlansApi.create({
           site: realSiteId,
           vlan_id: effectiveVlanId,
-          name: tpl.name,
+          name: override?.name || tpl.name,
           purpose: tpl.purpose,
         })
         vlanIdMap.set(`${entry.siteTempId}:${entry.vlanTempId}`, res.data.id)
@@ -199,10 +201,13 @@ export function WizardStepReview({ state, onBack }: Props) {
                   {siteEntries.map((e, i) => {
                     const tpl = getVlanTemplate(e.vlanTempId)
                     const vid = tpl ? getVlanIdForSite(tpl.vlanId, siteIdx, state) : '?'
+                    const tplIdx = state.vlanTemplates.findIndex((t) => t.tempId === e.vlanTempId)
+                    const overrideName = state.perSiteOverrides[site.tempId]?.[tplIdx]?.name
+                    const displayName = overrideName || tpl?.name
                     return (
                       <span key={i} className="text-muted-foreground">
                         {i > 0 && ', '}
-                        VLAN {vid} {tpl?.name} <span className="font-mono text-xs">{e.subnet}</span>
+                        VLAN {vid} {displayName} <span className="font-mono text-xs">{e.subnet}</span>
                       </span>
                     )
                   })}

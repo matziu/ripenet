@@ -4,6 +4,8 @@ import type {
   WizardAddressEntry,
   VLSMResult,
   VLSMAllocation,
+  VlanPreset,
+  SiteSummaryRoute,
 } from './wizard.types'
 
 /** Compute the effective VLAN ID for a given template at a given site index */
@@ -289,4 +291,313 @@ function numToIp(num: number): string {
 /** Generate a unique temp ID */
 export function tempId(): string {
   return Math.random().toString(36).slice(2, 10)
+}
+
+// ---------------------------------------------------------------------------
+// VLAN Template Presets
+// ---------------------------------------------------------------------------
+
+const STORAGE_KEY = 'ripe-net-vlan-presets'
+
+const BUILT_IN_PRESETS: VlanPreset[] = [
+  {
+    id: 'builtin-office',
+    name: 'Office',
+    builtIn: true,
+    templates: [
+      { vlanId: 10, name: 'Management', purpose: 'Network management', hostsNeeded: 10 },
+      { vlanId: 20, name: 'Users', purpose: 'End-user workstations', hostsNeeded: 100 },
+      { vlanId: 30, name: 'Voice', purpose: 'VoIP phones', hostsNeeded: 50 },
+      { vlanId: 40, name: 'Printers', purpose: 'Printers & peripherals', hostsNeeded: 10 },
+      { vlanId: 50, name: 'Guest', purpose: 'Guest Wi-Fi', hostsNeeded: 30 },
+    ],
+  },
+  {
+    id: 'builtin-datacenter',
+    name: 'Data Center',
+    builtIn: true,
+    templates: [
+      { vlanId: 10, name: 'Management', purpose: 'Out-of-band management', hostsNeeded: 20 },
+      { vlanId: 20, name: 'Servers', purpose: 'Production servers', hostsNeeded: 200 },
+      { vlanId: 30, name: 'Storage', purpose: 'SAN / NAS traffic', hostsNeeded: 30 },
+      { vlanId: 40, name: 'Backup', purpose: 'Backup network', hostsNeeded: 20 },
+      { vlanId: 50, name: 'DMZ', purpose: 'Internet-facing services', hostsNeeded: 20 },
+    ],
+  },
+  {
+    id: 'builtin-branch',
+    name: 'Branch',
+    builtIn: true,
+    templates: [
+      { vlanId: 10, name: 'Management', purpose: 'Network management', hostsNeeded: 5 },
+      { vlanId: 20, name: 'Users', purpose: 'End-user devices', hostsNeeded: 30 },
+      { vlanId: 30, name: 'Guest', purpose: 'Guest access', hostsNeeded: 10 },
+    ],
+  },
+]
+
+export function loadCustomPresets(): VlanPreset[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as VlanPreset[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveCustomPresets(presets: VlanPreset[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
+}
+
+export function getAllPresets(): VlanPreset[] {
+  return [...BUILT_IN_PRESETS, ...loadCustomPresets()]
+}
+
+export function saveCurrentAsPreset(name: string, state: WizardState): VlanPreset {
+  const preset: VlanPreset = {
+    id: 'custom-' + tempId(),
+    name,
+    builtIn: false,
+    templates: state.vlanTemplates.map(({ vlanId, name: n, purpose, hostsNeeded }) => ({
+      vlanId,
+      name: n,
+      purpose,
+      hostsNeeded,
+    })),
+  }
+  const custom = loadCustomPresets()
+  custom.push(preset)
+  saveCustomPresets(custom)
+  return preset
+}
+
+export function deleteCustomPreset(id: string): void {
+  const custom = loadCustomPresets().filter((p) => p.id !== id)
+  saveCustomPresets(custom)
+}
+
+// ---------------------------------------------------------------------------
+// Sequential Fixed-Size Addressing
+// ---------------------------------------------------------------------------
+
+/** Pack subnets sequentially from supernet base, incrementing by block size */
+export function buildSequentialFixedPlan(state: WizardState): WizardAddressEntry[] {
+  const [ipStr, prefixStr] = state.supernet.split('/')
+  const parts = ipStr.split('.').map(Number)
+  const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
+  const superPrefix = parseInt(prefixStr, 10)
+  const subPrefix = state.sequentialFixedPrefix
+  const blockSize = 1 << (32 - subPrefix)
+
+  // Align base to supernet boundary
+  const superMask = (0xffffffff << (32 - superPrefix)) >>> 0
+  const alignedBase = (baseNum & superMask) >>> 0
+
+  const plan: WizardAddressEntry[] = []
+  let offset = 0
+
+  for (const site of state.sites) {
+    const overrides = state.perSiteOverrides[site.tempId] ?? []
+    for (let i = 0; i < state.vlanTemplates.length; i++) {
+      const tpl = state.vlanTemplates[i]
+      const override = overrides[i]
+      if (override?.skip) continue
+
+      const subnetNum = (alignedBase + offset) >>> 0
+      const subnet = numToIp(subnetNum) + '/' + subPrefix
+      plan.push({
+        siteTempId: site.tempId,
+        vlanTempId: tpl.tempId,
+        subnet,
+        gateway: computeGateway(subnet),
+      })
+      offset += blockSize
+    }
+  }
+
+  return plan
+}
+
+/** Validate sequential fixed-size mode. Returns error messages or empty array. */
+export function validateSequentialFixed(state: WizardState): string[] {
+  const errors: string[] = []
+  if (!state.supernet.includes('/')) return ['Invalid supernet']
+  const superPrefix = parseInt(state.supernet.split('/')[1], 10)
+  const subPrefix = state.sequentialFixedPrefix
+
+  if (subPrefix <= superPrefix) {
+    errors.push(`Subnet prefix /${subPrefix} must be larger than supernet /${superPrefix}`)
+    return errors
+  }
+
+  // Count total non-skipped subnets needed
+  let needed = 0
+  for (const site of state.sites) {
+    const overrides = state.perSiteOverrides[site.tempId] ?? []
+    for (let i = 0; i < state.vlanTemplates.length; i++) {
+      if (!overrides[i]?.skip) needed++
+    }
+  }
+
+  const available = 1 << (subPrefix - superPrefix)
+  if (needed > available) {
+    errors.push(
+      `Need ${needed} /${subPrefix} subnets but supernet /${superPrefix} only contains ${available}`,
+    )
+  }
+
+  return errors
+}
+
+// ---------------------------------------------------------------------------
+// Site-in-2nd-Octet Addressing
+// ---------------------------------------------------------------------------
+
+/**
+ * Build site-in-octet address plan.
+ * Format: {firstOctet}.{siteIdx+1}.{vlanId}.0/{prefix}
+ */
+export function buildSiteInOctetPlan(state: WizardState): WizardAddressEntry[] {
+  const [ipStr] = state.supernet.split('/')
+  const firstOctet = parseInt(ipStr.split('.')[0], 10)
+  const subPrefix = state.vlanAlignedPrefix
+
+  const plan: WizardAddressEntry[] = []
+
+  for (let siteIdx = 0; siteIdx < state.sites.length; siteIdx++) {
+    const site = state.sites[siteIdx]
+    const overrides = state.perSiteOverrides[site.tempId] ?? []
+    const siteOctet = siteIdx + 1
+
+    for (let i = 0; i < state.vlanTemplates.length; i++) {
+      const tpl = state.vlanTemplates[i]
+      const override = overrides[i]
+      if (override?.skip) continue
+
+      const effectiveVlanId = getVlanIdForSite(tpl.vlanId, siteIdx, state)
+      const subnetNum =
+        ((firstOctet << 24) | (siteOctet << 16) | ((effectiveVlanId & 0xff) << 8) | 0) >>> 0
+      const subnet = numToIp(subnetNum) + '/' + subPrefix
+      plan.push({
+        siteTempId: site.tempId,
+        vlanTempId: tpl.tempId,
+        subnet,
+        gateway: computeGateway(subnet),
+      })
+    }
+  }
+
+  return plan
+}
+
+/** Validate site-in-octet mode constraints. Returns error messages or empty array. */
+export function validateSiteInOctet(state: WizardState): string[] {
+  const errors: string[] = []
+  if (!state.supernet.includes('/')) return ['Invalid supernet']
+  const prefix = parseInt(state.supernet.split('/')[1], 10)
+
+  if (prefix > 8) {
+    errors.push('Site-in-octet mode requires a supernet of /8 or larger')
+  }
+
+  if (state.sites.length > 254) {
+    errors.push(`Maximum 254 sites supported (2nd octet 1–254), but ${state.sites.length} defined`)
+  }
+
+  // Check all effective VLAN IDs fit in a single octet (0–255)
+  for (let siteIdx = 0; siteIdx < state.sites.length; siteIdx++) {
+    for (const tpl of state.vlanTemplates) {
+      const vid = getVlanIdForSite(tpl.vlanId, siteIdx, state)
+      if (vid > 255 || vid < 0) {
+        errors.push(
+          `VLAN IDs must be 0–255 for 3rd-octet mapping. VLAN ${tpl.vlanId} at site ${siteIdx + 1} resolves to ${vid}`,
+        )
+        return errors
+      }
+    }
+  }
+
+  return errors
+}
+
+// ---------------------------------------------------------------------------
+// Route Summarization
+// ---------------------------------------------------------------------------
+
+function ipToNum(ip: string): number {
+  const parts = ip.split('.').map(Number)
+  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
+}
+
+/** Compute per-site summary routes for the current address plan */
+export function computeSiteSummaryRoutes(state: WizardState): SiteSummaryRoute[] {
+  const results: SiteSummaryRoute[] = []
+
+  for (const site of state.sites) {
+    const siteEntries = state.addressPlan.filter((e) => e.siteTempId === site.tempId)
+    if (siteEntries.length === 0) {
+      results.push({
+        siteTempId: site.tempId,
+        summaryRoute: '',
+        subnetCount: 0,
+        canSummarize: false,
+        message: 'No subnets allocated',
+      })
+      continue
+    }
+
+    // Find the range spanning all subnets
+    let minAddr = 0xffffffff
+    let maxAddr = 0
+
+    for (const entry of siteEntries) {
+      const [ip, pStr] = entry.subnet.split('/')
+      const netNum = ipToNum(ip)
+      const prefix = parseInt(pStr, 10)
+      const hostBits = 32 - prefix
+      const broadcast = (netNum | ((1 << hostBits) - 1)) >>> 0
+      if (netNum < minAddr) minAddr = netNum
+      if (broadcast > maxAddr) maxAddr = broadcast
+    }
+
+    // Find smallest prefix that covers minAddr..maxAddr
+    const range = (maxAddr - minAddr + 1) >>> 0
+    let summaryBits = 0
+    let test = range
+    while (test > 1) {
+      test >>>= 1
+      summaryBits++
+    }
+    // Ensure power of 2
+    if ((1 << summaryBits) < range) summaryBits++
+
+    const summaryPrefix = 32 - summaryBits
+    const summaryMask = summaryPrefix === 0 ? 0 : (0xffffffff << summaryBits) >>> 0
+    const summaryNet = (minAddr & summaryMask) >>> 0
+    const summaryBroadcast = (summaryNet | ((1 << summaryBits) - 1)) >>> 0
+
+    const summaryRoute = numToIp(summaryNet) + '/' + summaryPrefix
+
+    // Check if summary cleanly covers all subnets (no wasted space outside allocated)
+    let allocatedTotal = 0
+    for (const entry of siteEntries) {
+      const prefix = parseInt(entry.subnet.split('/')[1], 10)
+      allocatedTotal += 1 << (32 - prefix)
+    }
+
+    const summaryTotal = (summaryBroadcast - summaryNet + 1) >>> 0
+    const canSummarize = allocatedTotal === summaryTotal
+
+    results.push({
+      siteTempId: site.tempId,
+      summaryRoute,
+      subnetCount: siteEntries.length,
+      canSummarize,
+      message: canSummarize
+        ? `Clean summary: ${summaryRoute} covers all ${siteEntries.length} subnets`
+        : `${summaryRoute} covers all ${siteEntries.length} subnets but includes ${summaryTotal - allocatedTotal} unused addresses`,
+    })
+  }
+
+  return results
 }

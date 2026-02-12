@@ -110,7 +110,9 @@ export function WizardStepProject({ state, onChange, onNext }: Props) {
           className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          The address block to subdivide for all sites and VLANs.
+          The address block to subdivide for all sites and VLANs. Larger blocks (e.g. /8) enable
+          structured modes where site/VLAN map to IP octets. Smaller blocks work best with VLSM or
+          sequential.
         </p>
       </div>
 

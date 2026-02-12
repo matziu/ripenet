@@ -17,6 +17,22 @@ export interface WizardVlanTemplate {
 export interface WizardSiteOverride {
   skip?: boolean
   hostsNeeded?: number
+  name?: string
+}
+
+export interface VlanPreset {
+  id: string
+  name: string
+  builtIn: boolean
+  templates: Omit<WizardVlanTemplate, 'tempId'>[]
+}
+
+export interface SiteSummaryRoute {
+  siteTempId: string
+  summaryRoute: string
+  subnetCount: number
+  canSummarize: boolean
+  message: string
 }
 
 export interface WizardAddressEntry {
@@ -69,8 +85,9 @@ export interface WizardState {
   vlanSiteOffset: number      // per-site mode: offset between sites (e.g. 100)
 
   // Step 4: Address Plan
-  addressingMode: 'vlsm' | 'vlan-aligned'
+  addressingMode: 'vlsm' | 'vlan-aligned' | 'site-in-octet' | 'sequential-fixed'
   vlanAlignedPrefix: number    // subnet prefix for vlan-aligned mode (default 24)
+  sequentialFixedPrefix: number // subnet prefix for sequential-fixed mode (default 24)
   vlsmResult?: VLSMResult
   addressPlan: WizardAddressEntry[]
 
@@ -96,6 +113,7 @@ export const initialWizardState: WizardState = {
   vlanSiteOffset: 100,
   addressingMode: 'vlsm',
   vlanAlignedPrefix: 24,
+  sequentialFixedPrefix: 24,
   addressPlan: [],
   tunnelMode: 'none',
   tunnelType: 'wireguard',

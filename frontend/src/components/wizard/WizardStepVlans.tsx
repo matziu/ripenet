@@ -1,7 +1,13 @@
 import { useState } from 'react'
-import { Plus, Trash2, Settings2 } from 'lucide-react'
+import { Plus, Trash2, Settings2, Save, X } from 'lucide-react'
 import type { WizardState, WizardSiteOverride } from '@/lib/wizard.types'
-import { tempId, getVlanIdForSite } from '@/lib/wizard.utils'
+import {
+  tempId,
+  getVlanIdForSite,
+  getAllPresets,
+  saveCurrentAsPreset,
+  deleteCustomPreset,
+} from '@/lib/wizard.utils'
 
 interface Props {
   state: WizardState
@@ -12,6 +18,34 @@ interface Props {
 
 export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
   const [showOverrides, setShowOverrides] = useState(false)
+  const [presets, setPresets] = useState(getAllPresets)
+  const [savingPreset, setSavingPreset] = useState(false)
+  const [presetName, setPresetName] = useState('')
+
+  const loadPreset = (presetId: string) => {
+    const preset = presets.find((p) => p.id === presetId)
+    if (!preset) return
+    onChange({
+      vlanTemplates: preset.templates.map((t) => ({
+        ...t,
+        tempId: tempId(),
+      })),
+      perSiteOverrides: {},
+    })
+  }
+
+  const handleSavePreset = () => {
+    if (!presetName.trim() || state.vlanTemplates.length === 0) return
+    saveCurrentAsPreset(presetName.trim(), state)
+    setPresets(getAllPresets())
+    setPresetName('')
+    setSavingPreset(false)
+  }
+
+  const handleDeletePreset = (id: string) => {
+    deleteCustomPreset(id)
+    setPresets(getAllPresets())
+  }
 
   /** Re-number all template VLAN IDs from current start/step */
   const applyAutoNumber = (start: number, step: number) => {
@@ -81,6 +115,76 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
           Define VLAN templates that will be replicated across all sites. Specify the number of
           hosts needed per VLAN for automatic subnet sizing.
         </p>
+      </div>
+
+      {/* Presets */}
+      <div className="rounded-md border border-border p-4 space-y-3">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Presets
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {presets.map((preset) => (
+            <div key={preset.id} className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => loadPreset(preset.id)}
+                className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent hover:text-foreground transition-colors"
+              >
+                {preset.name}
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({preset.templates.length})
+                </span>
+              </button>
+              {!preset.builtIn && (
+                <button
+                  type="button"
+                  onClick={() => handleDeletePreset(preset.id)}
+                  className="p-1 rounded hover:bg-destructive/10"
+                  title="Delete preset"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {!savingPreset ? (
+          <button
+            type="button"
+            onClick={() => setSavingPreset(true)}
+            disabled={state.vlanTemplates.length === 0}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            <Save className="h-3.5 w-3.5" />
+            Save current as preset
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSavePreset()}
+              placeholder="Preset name"
+              autoFocus
+              className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleSavePreset}
+              disabled={!presetName.trim()}
+              className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSavingPreset(false); setPresetName('') }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
 
       {/* VLAN Numbering Config */}
@@ -278,30 +382,44 @@ export function WizardStepVlans({ state, onChange, onNext, onBack }: Props) {
                         const vid = getVlanIdForSite(tpl.vlanId, siteIdx, state)
                         return (
                           <td key={tpl.tempId} className="px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              <label className="flex items-center gap-1 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={!ov.skip}
-                                  onChange={(e) =>
-                                    updateOverride(site.tempId, tplIdx, { skip: !e.target.checked })
-                                  }
-                                  className="rounded"
-                                />
-                                <span className="font-mono">{vid}</span>
-                              </label>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <label className="flex items-center gap-1 text-xs">
+                                  <input
+                                    type="checkbox"
+                                    checked={!ov.skip}
+                                    onChange={(e) =>
+                                      updateOverride(site.tempId, tplIdx, { skip: !e.target.checked })
+                                    }
+                                    className="rounded"
+                                  />
+                                  <span className="font-mono">{vid}</span>
+                                </label>
+                                {!ov.skip && (
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={ov.hostsNeeded ?? ''}
+                                    onChange={(e) =>
+                                      updateOverride(site.tempId, tplIdx, {
+                                        hostsNeeded: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                                      })
+                                    }
+                                    placeholder={String(tpl.hostsNeeded)}
+                                    className="w-16 rounded-md border border-input bg-background px-2 py-0.5 text-xs"
+                                  />
+                                )}
+                              </div>
                               {!ov.skip && (
                                 <input
-                                  type="number"
-                                  min={1}
-                                  value={ov.hostsNeeded ?? ''}
+                                  value={ov.name ?? ''}
                                   onChange={(e) =>
                                     updateOverride(site.tempId, tplIdx, {
-                                      hostsNeeded: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                                      name: e.target.value || undefined,
                                     })
                                   }
-                                  placeholder={String(tpl.hostsNeeded)}
-                                  className="w-16 rounded-md border border-input bg-background px-2 py-0.5 text-xs"
+                                  placeholder={tpl.name}
+                                  className="w-full rounded-md border border-input bg-background px-2 py-0.5 text-xs"
                                 />
                               )}
                             </div>
