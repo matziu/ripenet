@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { useEffect } from 'react'
 import { useSelectionStore } from '@/stores/selection.store'
 
-const TAB_NAMES = ['sites', 'vlans', 'subnets', 'hosts', 'tunnels'] as const
+const TAB_NAMES = ['network', 'tunnels'] as const
 export type TableTab = (typeof TAB_NAMES)[number]
 
 function parseWildcard(wildcard: string | undefined) {
@@ -48,7 +48,7 @@ export function ProjectPage() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
       if (e.key === '1') navigate(`/projects/${id}/topology`, { replace: true })
       else if (e.key === '2') navigate(`/projects/${id}/geo`, { replace: true })
-      else if (e.key === '3') navigate(`/projects/${id}/table/hosts`, { replace: true })
+      else if (e.key === '3') navigate(`/projects/${id}/table/network`, { replace: true })
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
@@ -58,9 +58,9 @@ export function ProjectPage() {
   if (!view) {
     return <Navigate to={`/projects/${id}/topology`} replace />
   }
-  // Redirect /projects/:id/table to /projects/:id/table/hosts
+  // Redirect /projects/:id/table to /projects/:id/table/network
   if (view === 'table' && !tab) {
-    return <Navigate to={`/projects/${id}/table/hosts`} replace />
+    return <Navigate to={`/projects/${id}/table/network`} replace />
   }
 
   if (!project) {
