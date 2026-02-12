@@ -375,18 +375,39 @@ function SubnetsTable({ projectId }: { projectId: number }) {
   )
 }
 
-// ─── Hosts ────────────────────────────────────────────────────
+// ─── Hosts (grouped by Subnet) ────────────────────────────────
 
 function HostsTable({ projectId }: { projectId: number }) {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editHost, setEditHost] = useState<Host | undefined>()
+  const [addForSubnetId, setAddForSubnetId] = useState<number | undefined>()
 
   const { data: hosts } = useQuery({
     queryKey: ['hosts', { project: projectId }],
     queryFn: () => hostsApi.list({ project: String(projectId) }),
     select: (res) => res.data.results,
   })
+
+  const { data: subnets } = useQuery({
+    queryKey: ['subnets', { project: projectId }],
+    queryFn: () => subnetsApi.list({ project: String(projectId) }),
+    select: (res) => res.data.results,
+  })
+
+  const grouped = useMemo(() => {
+    if (!hosts || !subnets) return []
+    const subnetMap = new Map(subnets.map((s) => [s.id, s]))
+    const groups = new Map<number, { subnet: Subnet; hosts: Host[] }>()
+    for (const host of hosts) {
+      const subnet = subnetMap.get(host.subnet)
+      if (!subnet) continue
+      const group = groups.get(subnet.id)
+      if (group) group.hosts.push(host)
+      else groups.set(subnet.id, { subnet, hosts: [host] })
+    }
+    return Array.from(groups.values())
+  }, [hosts, subnets])
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => hostsApi.delete(id),
@@ -396,8 +417,8 @@ function HostsTable({ projectId }: { projectId: number }) {
     },
   })
 
-  const openAdd = () => { setEditHost(undefined); setDialogOpen(true) }
-  const openEdit = (host: Host) => { setEditHost(host); setDialogOpen(true) }
+  const openAdd = (subnetId?: number) => { setEditHost(undefined); setAddForSubnetId(subnetId); setDialogOpen(true) }
+  const openEdit = (host: Host) => { setEditHost(host); setAddForSubnetId(host.subnet); setDialogOpen(true) }
   const handleDelete = (host: Host) => {
     if (window.confirm(`Delete host "${host.hostname || host.ip_address}"?`)) deleteMutation.mutate(host.id)
   }
@@ -405,8 +426,8 @@ function HostsTable({ projectId }: { projectId: number }) {
   return (
     <>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-muted-foreground">{hosts?.length ?? 0} hosts</h3>
-        <button onClick={openAdd} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+        <h3 className="text-sm font-medium text-muted-foreground">{hosts?.length ?? 0} hosts across {grouped.length} subnets</h3>
+        <button onClick={() => openAdd()} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
           <Plus className="h-3.5 w-3.5" /> Add Host
         </button>
       </div>
@@ -422,34 +443,53 @@ function HostsTable({ projectId }: { projectId: number }) {
           </tr>
         </thead>
         <tbody>
-          {hosts?.map((host) => (
-            <tr key={host.id} className="border-b border-border hover:bg-accent/30">
-              <td className="px-3 py-2">
-                <CopyableIP ip={host.ip_address} />
-              </td>
-              <td className="px-3 py-2">{host.hostname || '-'}</td>
-              <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{host.mac_address || '-'}</td>
-              <td className="px-3 py-2">
-                <StatusBadge status={host.status} />
-              </td>
-              <td className="px-3 py-2 text-muted-foreground">{host.device_type}</td>
-              <td className="px-3 py-2">
-                <div className="flex gap-1">
-                  <button onClick={() => openEdit(host)} className="p-1 rounded hover:bg-accent" title="Edit">
-                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+          {grouped.map(({ subnet, hosts: subnetHosts }) => (
+            <GroupRows key={subnet.id}>
+              <tr className="bg-muted/40">
+                <td colSpan={5} className="px-3 py-1.5">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <Network className="h-3 w-3" />
+                    {subnet.network}
+                    {subnet.gateway && <span className="font-normal">gw {subnet.gateway}</span>}
+                    <span className="font-normal">({subnetHosts.length})</span>
+                  </span>
+                </td>
+                <td className="px-3 py-1.5 text-right">
+                  <button onClick={() => openAdd(subnet.id)} className="p-1 rounded hover:bg-accent" title={`Add host to ${subnet.network}`}>
+                    <Plus className="h-3.5 w-3.5 text-muted-foreground" />
                   </button>
-                  <button onClick={() => handleDelete(host)} className="p-1 rounded hover:bg-destructive/20" title="Delete">
-                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                  </button>
-                </div>
-              </td>
-            </tr>
+                </td>
+              </tr>
+              {subnetHosts.map((host) => (
+                <tr key={host.id} className="border-b border-border hover:bg-accent/30">
+                  <td className="px-3 py-2 pl-7">
+                    <CopyableIP ip={host.ip_address} />
+                  </td>
+                  <td className="px-3 py-2">{host.hostname || '-'}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{host.mac_address || '-'}</td>
+                  <td className="px-3 py-2">
+                    <StatusBadge status={host.status} />
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{host.device_type}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(host)} className="p-1 rounded hover:bg-accent" title="Edit">
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                      <button onClick={() => handleDelete(host)} className="p-1 rounded hover:bg-destructive/20" title="Delete">
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </GroupRows>
           ))}
         </tbody>
       </table>
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen} title={editHost ? 'Edit Host' : 'Add Host'}>
         <HostForm
-          subnetId={editHost?.subnet}
+          subnetId={addForSubnetId}
           projectId={projectId}
           host={editHost}
           onClose={() => setDialogOpen(false)}
