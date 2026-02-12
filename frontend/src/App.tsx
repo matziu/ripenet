@@ -6,6 +6,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { ProjectPage } from '@/pages/ProjectPage'
 import { ProjectsListPage } from '@/pages/ProjectsListPage'
 import { LoginPage } from '@/pages/LoginPage'
+import { WizardPage } from '@/pages/WizardPage'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { useUIStore } from '@/stores/ui.store'
 import { authApi } from '@/api/endpoints'
@@ -61,6 +62,7 @@ function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/projects" element={<ProjectsListPage />} />
           <Route path="/projects/:projectId/*" element={<ProjectPage />} />
+          <Route path="/wizard" element={<WizardPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

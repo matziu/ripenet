@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { projectsApi } from '@/api/endpoints'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { FolderOpen, Plus, MapPin } from 'lucide-react'
+import { FolderOpen, Plus, MapPin, Wand2 } from 'lucide-react'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -19,13 +19,22 @@ export function DashboardPage() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">IP Address Management</p>
         </div>
-        <button
-          onClick={() => navigate('/projects')}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          New Project
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/wizard')}
+            className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <Wand2 className="h-4 w-4" />
+            Design Wizard
+          </button>
+          <button
+            onClick={() => navigate('/projects')}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            New Project
+          </button>
+        </div>
       </div>
 
       {isLoading && (

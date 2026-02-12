@@ -5,7 +5,7 @@ import { projectsApi } from '@/api/endpoints'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/ui/Dialog'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Wand2 } from 'lucide-react'
 import type { Project } from '@/types'
 
 export function ProjectsListPage() {
@@ -56,13 +56,22 @@ export function ProjectsListPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Projects</h1>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          New Project
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/wizard')}
+            className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <Wand2 className="h-4 w-4" />
+            Design Wizard
+          </button>
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            New Project
+          </button>
+        </div>
       </div>
 
       {showCreate && (
