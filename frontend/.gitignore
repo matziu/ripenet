@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Debug/test artifacts
+debug-*.png
+test-*.ts
