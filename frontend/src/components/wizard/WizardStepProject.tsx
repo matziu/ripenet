@@ -16,17 +16,16 @@ export function WizardStepProject({ state, onChange, onNext }: Props) {
   })
 
   const valid =
-    state.supernet.trim() !== '' &&
-    (state.projectMode === 'new'
+    state.projectMode === 'new'
       ? state.projectName.trim() !== ''
-      : state.projectId !== undefined)
+      : state.projectId !== undefined
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold mb-1">Project Setup</h2>
         <p className="text-sm text-muted-foreground">
-          Choose an existing project or create a new one, then define the supernet for address allocation.
+          Choose an existing project or create a new one.
         </p>
       </div>
 
@@ -100,21 +99,6 @@ export function WizardStepProject({ state, onChange, onNext }: Props) {
           </select>
         </div>
       )}
-
-      <div>
-        <label className="text-xs font-medium">Supernet CIDR</label>
-        <input
-          value={state.supernet}
-          onChange={(e) => onChange({ supernet: e.target.value })}
-          placeholder="e.g. 10.0.0.0/16"
-          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          The address block to subdivide for all sites and VLANs. Larger blocks (e.g. /8) enable
-          structured modes where site/VLAN map to IP octets. Smaller blocks work best with VLSM or
-          sequential.
-        </p>
-      </div>
 
       <div className="flex justify-end">
         <button

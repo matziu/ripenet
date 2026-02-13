@@ -35,6 +35,7 @@ class Site(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="sites")
     name = models.CharField(max_length=200)
     address = models.TextField(blank=True)
+    supernet = CidrAddressField(blank=True, null=True, help_text="Override. Null = inherit from project.")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

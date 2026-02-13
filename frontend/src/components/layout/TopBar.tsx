@@ -46,7 +46,7 @@ export function TopBar() {
         <button onClick={toggleSidebar} className="p-1.5 rounded-md hover:bg-accent" title="Toggle sidebar">
           {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
         </button>
-        <span className="font-semibold text-sm tracking-tight">RIPE-NET</span>
+        <button onClick={() => navigate('/')} className="font-semibold text-sm tracking-tight hover:text-primary transition-colors">RIPE-NET</button>
       </div>
 
       <button

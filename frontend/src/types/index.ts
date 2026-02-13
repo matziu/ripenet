@@ -25,6 +25,7 @@ export interface Site {
   project: number
   name: string
   address: string
+  supernet: string | null
   latitude: number | null
   longitude: number | null
   vlan_count: number

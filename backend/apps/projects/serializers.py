@@ -10,10 +10,10 @@ class SiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Site
         fields = [
-            "id", "project", "name", "address", "latitude", "longitude",
+            "id", "project", "name", "address", "supernet", "latitude", "longitude",
             "vlan_count", "host_count", "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "project", "created_at", "updated_at"]
 
 
 class ProjectSerializer(serializers.ModelSerializer):

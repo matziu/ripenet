@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { projectsApi, sitesApi, vlansApi, subnetsApi, tunnelsApi } from '@/api/endpoints'
 import type { WizardState } from '@/lib/wizard.types'
-import { getVlanIdForSite } from '@/lib/wizard.utils'
+import { getVlanIdForSite, getSiteSupernet } from '@/lib/wizard.utils'
 
 interface Props {
   state: WizardState
@@ -71,6 +71,9 @@ export function WizardStepReview({ state, onBack }: Props) {
         const res = await sitesApi.create(projectId, {
           name: site.name,
           address: site.address,
+          supernet: state.siteSupernetsEnabled && site.supernet?.trim() ? site.supernet.trim() : null,
+          latitude: site.latitude,
+          longitude: site.longitude,
         })
         siteIdMap.set(site.tempId, res.data.id)
         setProgress({ phase: 'sites', current: i + 1, total: state.sites.length })
@@ -174,14 +177,27 @@ export function WizardStepReview({ state, onBack }: Props) {
             Sites ({state.sites.length})
           </h3>
           <div className="flex flex-wrap gap-2">
-            {state.sites.map((s) => (
-              <span
-                key={s.tempId}
-                className="rounded-md bg-muted px-2 py-1 text-sm"
-              >
-                {s.name}
-              </span>
-            ))}
+            {state.sites.map((s) => {
+              const hasOverride = state.siteSupernetsEnabled && s.supernet?.trim()
+              return (
+                <span
+                  key={s.tempId}
+                  className="rounded-md bg-muted px-2 py-1 text-sm"
+                >
+                  {s.name}
+                  {hasOverride && (
+                    <span className="ml-1 font-mono text-xs text-blue-500">
+                      ({s.supernet.trim()})
+                    </span>
+                  )}
+                  {s.latitude != null && s.longitude != null && (
+                    <span className="ml-1 font-mono text-xs text-muted-foreground">
+                      ({s.latitude}, {s.longitude})
+                    </span>
+                  )}
+                </span>
+              )
+            })}
           </div>
         </div>
 

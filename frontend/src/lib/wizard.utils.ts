@@ -8,6 +8,36 @@ import type {
   SiteSummaryRoute,
 } from './wizard.types'
 
+/** Effective supernet for a site — override or fallback to project */
+export function getSiteSupernet(state: WizardState, siteTempId: string): string {
+  if (!state.siteSupernetsEnabled) return state.supernet
+  const site = state.sites.find((s) => s.tempId === siteTempId)
+  return site?.supernet?.trim() || state.supernet
+}
+
+/** Are there mixed supernets across sites? */
+export function hasMixedSupernets(state: WizardState): boolean {
+  if (!state.siteSupernetsEnabled) return false
+  return state.sites.some((s) => s.supernet?.trim() && s.supernet.trim() !== state.supernet)
+}
+
+/** Group VLSM requirements by effective supernet */
+export function buildVlsmRequirementsBySupernet(state: WizardState) {
+  const groups = new Map<string, { name: string; hosts: number }[]>()
+  for (const site of state.sites) {
+    const sn = getSiteSupernet(state, site.tempId)
+    const reqs = groups.get(sn) ?? []
+    const overrides = state.perSiteOverrides[site.tempId] ?? []
+    for (let i = 0; i < state.vlanTemplates.length; i++) {
+      const tpl = state.vlanTemplates[i]
+      if (overrides[i]?.skip) continue
+      reqs.push({ name: `${site.name} - ${tpl.name}`, hosts: overrides[i]?.hostsNeeded ?? tpl.hostsNeeded })
+    }
+    groups.set(sn, reqs)
+  }
+  return groups
+}
+
 /** Compute the effective VLAN ID for a given template at a given site index */
 export function getVlanIdForSite(
   baseVlanId: number,
@@ -79,23 +109,29 @@ export function buildAddressPlan(
  * VLAN ID maps to the 3rd octet → e.g. VLAN 100 = x.x.100.0/24
  */
 export function buildVlanAlignedPlan(state: WizardState): WizardAddressEntry[] {
-  const [ipStr] = state.supernet.split('/')
-  const parts = ipStr.split('.').map(Number)
-  const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
-  // Align to /16 boundary
-  const base16 = baseNum & 0xffff0000
   const subnetPrefix = state.vlanAlignedPrefix
   const perSite = state.vlanNumbering === 'per-site'
 
   const plan: WizardAddressEntry[] = []
+  // Track per-supernet site index for "same" VLAN numbering offset
+  const siteIdxBySupernet = new Map<string, number>()
 
   for (let siteIdx = 0; siteIdx < state.sites.length; siteIdx++) {
     const site = state.sites[siteIdx]
     const overrides = state.perSiteOverrides[site.tempId] ?? []
 
+    const effectiveSupernet = getSiteSupernet(state, site.tempId)
+    const [ipStr] = effectiveSupernet.split('/')
+    const parts = ipStr.split('.').map(Number)
+    const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
+    const base16 = baseNum & 0xffff0000
+
+    const snIdx = siteIdxBySupernet.get(effectiveSupernet) ?? 0
+    siteIdxBySupernet.set(effectiveSupernet, snIdx + 1)
+
     // Per-site unique VLAN IDs: all sites share the same /16 (IDs don't collide)
     // Same VLAN IDs: each site gets a separate /16 block
-    const siteBaseNum = perSite ? base16 : (base16 + (siteIdx << 16)) >>> 0
+    const siteBaseNum = perSite ? base16 : (base16 + (snIdx << 16)) >>> 0
 
     for (let i = 0; i < state.vlanTemplates.length; i++) {
       const tpl = state.vlanTemplates[i]
@@ -121,21 +157,33 @@ export function buildVlanAlignedPlan(state: WizardState): WizardAddressEntry[] {
 /** Validate VLAN-aligned mode constraints. Returns error messages or empty array. */
 export function validateVlanAligned(state: WizardState): string[] {
   const errors: string[] = []
-  if (!state.supernet.includes('/')) return ['Invalid supernet']
-  const prefix = parseInt(state.supernet.split('/')[1], 10)
   const perSite = state.vlanNumbering === 'per-site'
 
-  if (prefix > 16) {
-    errors.push('VLAN-aligned mode requires a supernet of /16 or larger')
+  // Validate each effective supernet
+  const sitesPerSupernet = new Map<string, number>()
+  for (const site of state.sites) {
+    const sn = getSiteSupernet(state, site.tempId)
+    if (!sn.includes('/')) {
+      errors.push(`Site "${site.name}": invalid supernet`)
+      continue
+    }
+    sitesPerSupernet.set(sn, (sitesPerSupernet.get(sn) ?? 0) + 1)
+    const prefix = parseInt(sn.split('/')[1], 10)
+    if (prefix > 16) {
+      errors.push(`Site "${site.name}": VLAN-aligned mode requires a supernet of /16 or larger (got /${prefix})`)
+    }
   }
 
   if (!perSite) {
-    // Same VLAN IDs: each site needs its own /16 block
-    const available16Blocks = prefix <= 16 ? 1 << (16 - prefix) : 0
-    if (state.sites.length > available16Blocks) {
-      errors.push(
-        `With same VLAN IDs per site, supernet /${prefix} provides ${available16Blocks} /16 block(s), but ${state.sites.length} sites are defined. Use a larger supernet or switch to unique-per-site numbering.`,
-      )
+    // Same VLAN IDs: each site group needs its own /16 blocks within its supernet
+    for (const [sn, count] of sitesPerSupernet) {
+      const prefix = parseInt(sn.split('/')[1], 10)
+      const available16Blocks = prefix <= 16 ? 1 << (16 - prefix) : 0
+      if (count > available16Blocks) {
+        errors.push(
+          `Supernet ${sn}: provides ${available16Blocks} /16 block(s) but ${count} sites use it. Use a larger supernet or switch to unique-per-site numbering.`,
+        )
+      }
     }
   }
 
@@ -268,6 +316,8 @@ export function generatePointToPointSlots(
   if (prefix > ptp) return []
 
   const parts = ip.split('.').map(Number)
+  if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) return []
+  if (isNaN(prefix) || prefix < 16 || prefix > 32) return []
   const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
   const totalAddresses = 1 << (32 - prefix)
   const step = ptp === 31 ? 2 : 4
@@ -398,22 +448,25 @@ export function deleteCustomPreset(id: string): void {
 
 /** Pack subnets sequentially from supernet base, incrementing by block size */
 export function buildSequentialFixedPlan(state: WizardState): WizardAddressEntry[] {
-  const [ipStr, prefixStr] = state.supernet.split('/')
-  const parts = ipStr.split('.').map(Number)
-  const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
-  const superPrefix = parseInt(prefixStr, 10)
   const subPrefix = state.sequentialFixedPrefix
   const blockSize = 1 << (32 - subPrefix)
 
-  // Align base to supernet boundary
-  const superMask = (0xffffffff << (32 - superPrefix)) >>> 0
-  const alignedBase = (baseNum & superMask) >>> 0
-
   const plan: WizardAddressEntry[] = []
-  let offset = 0
+  // Track offset per supernet
+  const offsetBySupernet = new Map<string, number>()
 
   for (const site of state.sites) {
     const overrides = state.perSiteOverrides[site.tempId] ?? []
+    const effectiveSupernet = getSiteSupernet(state, site.tempId)
+    const [ipStr, prefixStr] = effectiveSupernet.split('/')
+    const parts = ipStr.split('.').map(Number)
+    const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
+    const superPrefix = parseInt(prefixStr, 10)
+    const superMask = (0xffffffff << (32 - superPrefix)) >>> 0
+    const alignedBase = (baseNum & superMask) >>> 0
+
+    let offset = offsetBySupernet.get(effectiveSupernet) ?? 0
+
     for (let i = 0; i < state.vlanTemplates.length; i++) {
       const tpl = state.vlanTemplates[i]
       const override = overrides[i]
@@ -429,6 +482,8 @@ export function buildSequentialFixedPlan(state: WizardState): WizardAddressEntry
       })
       offset += blockSize
     }
+
+    offsetBySupernet.set(effectiveSupernet, offset)
   }
 
   return plan
@@ -437,29 +492,36 @@ export function buildSequentialFixedPlan(state: WizardState): WizardAddressEntry
 /** Validate sequential fixed-size mode. Returns error messages or empty array. */
 export function validateSequentialFixed(state: WizardState): string[] {
   const errors: string[] = []
-  if (!state.supernet.includes('/')) return ['Invalid supernet']
-  const superPrefix = parseInt(state.supernet.split('/')[1], 10)
   const subPrefix = state.sequentialFixedPrefix
 
-  if (subPrefix <= superPrefix) {
-    errors.push(`Subnet prefix /${subPrefix} must be larger than supernet /${superPrefix}`)
-    return errors
-  }
-
-  // Count total non-skipped subnets needed
-  let needed = 0
+  // Count needed subnets per supernet
+  const neededBySupernet = new Map<string, number>()
   for (const site of state.sites) {
-    const overrides = state.perSiteOverrides[site.tempId] ?? []
-    for (let i = 0; i < state.vlanTemplates.length; i++) {
-      if (!overrides[i]?.skip) needed++
+    const sn = getSiteSupernet(state, site.tempId)
+    if (!sn.includes('/')) {
+      errors.push(`Site "${site.name}": invalid supernet`)
+      continue
     }
+    const overrides = state.perSiteOverrides[site.tempId] ?? []
+    let count = 0
+    for (let i = 0; i < state.vlanTemplates.length; i++) {
+      if (!overrides[i]?.skip) count++
+    }
+    neededBySupernet.set(sn, (neededBySupernet.get(sn) ?? 0) + count)
   }
 
-  const available = 1 << (subPrefix - superPrefix)
-  if (needed > available) {
-    errors.push(
-      `Need ${needed} /${subPrefix} subnets but supernet /${superPrefix} only contains ${available}`,
-    )
+  for (const [sn, needed] of neededBySupernet) {
+    const superPrefix = parseInt(sn.split('/')[1], 10)
+    if (subPrefix <= superPrefix) {
+      errors.push(`Subnet prefix /${subPrefix} must be larger than supernet ${sn} (/${superPrefix})`)
+      continue
+    }
+    const available = 1 << (subPrefix - superPrefix)
+    if (needed > available) {
+      errors.push(
+        `Need ${needed} /${subPrefix} subnets but supernet ${sn} only contains ${available}`,
+      )
+    }
   }
 
   return errors
@@ -474,16 +536,22 @@ export function validateSequentialFixed(state: WizardState): string[] {
  * Format: {firstOctet}.{siteIdx+1}.{vlanId}.0/{prefix}
  */
 export function buildSiteInOctetPlan(state: WizardState): WizardAddressEntry[] {
-  const [ipStr] = state.supernet.split('/')
-  const firstOctet = parseInt(ipStr.split('.')[0], 10)
   const subPrefix = state.vlanAlignedPrefix
 
   const plan: WizardAddressEntry[] = []
+  // Track per-supernet site index for 2nd octet
+  const siteIdxBySupernet = new Map<string, number>()
 
   for (let siteIdx = 0; siteIdx < state.sites.length; siteIdx++) {
     const site = state.sites[siteIdx]
     const overrides = state.perSiteOverrides[site.tempId] ?? []
-    const siteOctet = siteIdx + 1
+
+    const effectiveSupernet = getSiteSupernet(state, site.tempId)
+    const firstOctet = parseInt(effectiveSupernet.split('.')[0], 10)
+
+    const snIdx = siteIdxBySupernet.get(effectiveSupernet) ?? 0
+    siteIdxBySupernet.set(effectiveSupernet, snIdx + 1)
+    const siteOctet = snIdx + 1
 
     for (let i = 0; i < state.vlanTemplates.length; i++) {
       const tpl = state.vlanTemplates[i]
@@ -509,15 +577,26 @@ export function buildSiteInOctetPlan(state: WizardState): WizardAddressEntry[] {
 /** Validate site-in-octet mode constraints. Returns error messages or empty array. */
 export function validateSiteInOctet(state: WizardState): string[] {
   const errors: string[] = []
-  if (!state.supernet.includes('/')) return ['Invalid supernet']
-  const prefix = parseInt(state.supernet.split('/')[1], 10)
 
-  if (prefix > 8) {
-    errors.push('Site-in-octet mode requires a supernet of /8 or larger')
+  // Validate per effective supernet
+  const sitesPerSupernet = new Map<string, number>()
+  for (const site of state.sites) {
+    const sn = getSiteSupernet(state, site.tempId)
+    if (!sn.includes('/')) {
+      errors.push(`Site "${site.name}": invalid supernet`)
+      continue
+    }
+    sitesPerSupernet.set(sn, (sitesPerSupernet.get(sn) ?? 0) + 1)
+    const prefix = parseInt(sn.split('/')[1], 10)
+    if (prefix > 8) {
+      errors.push(`Site "${site.name}": site-in-octet mode requires a supernet of /8 or larger (got ${sn})`)
+    }
   }
 
-  if (state.sites.length > 254) {
-    errors.push(`Maximum 254 sites supported (2nd octet 1–254), but ${state.sites.length} defined`)
+  for (const [sn, count] of sitesPerSupernet) {
+    if (count > 254) {
+      errors.push(`Supernet ${sn}: maximum 254 sites (2nd octet 1–254), but ${count} sites use it`)
+    }
   }
 
   // Check all effective VLAN IDs fit in a single octet (0–255)
@@ -568,17 +647,21 @@ export function suggestTunnelBlock(
   tunnelCount: number,
   ptp: 30 | 31,
   allocMode: WizardState['tunnelAllocMode'],
+  allocStart: 'start' | 'end' = 'end',
 ): string {
   if (tunnelCount <= 0 || !supernet || !supernet.includes('/')) return ''
   const minPrefix = computeMinTunnelBlock(tunnelCount, ptp)
   const blockSize = 1 << (32 - minPrefix)
 
   if (allocMode === 'from-supernet') {
-    // Carve from the end of the supernet
     const [ipStr, prefixStr] = supernet.split('/')
     const superPrefix = parseInt(prefixStr, 10)
     if (minPrefix < superPrefix) return '' // block won't fit
     const superBase = ipToNum(ipStr)
+    if (allocStart === 'start') {
+      return numToIp(superBase) + '/' + minPrefix
+    }
+    // 'end': carve from the end of the supernet
     const superSize = 1 << (32 - superPrefix)
     const superEnd = (superBase + superSize) >>> 0
     const tunnelBase = (superEnd - blockSize) >>> 0
@@ -588,20 +671,105 @@ export function suggestTunnelBlock(
   if (allocMode === 'separate') {
     // Pick from a different RFC1918 range
     const firstOctet = parseInt(supernet.split('.')[0], 10)
+    if (allocStart === 'start') {
+      // Allocate from the beginning of the alternate range
+      if (firstOctet === 10) return '172.16.0.0/' + minPrefix
+      if (firstOctet === 172) return '10.0.0.0/' + minPrefix
+      return '172.16.0.0/' + minPrefix // 192.168.x
+    }
+    // 'end': allocate from the end of the alternate range
     if (firstOctet === 10) {
-      // Supernet in 10.x → use 172.16.0.0/X
-      return '172.16.0.0/' + minPrefix
+      // End of 172.16.0.0/12 → 172.31.255.252 area
+      const rangeEnd = (ipToNum('172.31.255.252') - blockSize + 4) >>> 0
+      return numToIp(rangeEnd) + '/' + minPrefix
     }
     if (firstOctet === 172) {
-      // Supernet in 172.x → use 10.255.255.X from the end of 10/8
-      const base = (ipToNum('10.255.255.252') - blockSize + 4) >>> 0
-      return numToIp(base) + '/' + minPrefix
+      // End of 10.0.0.0/8 → 10.255.255.252 area
+      const rangeEnd = (ipToNum('10.255.255.252') - blockSize + 4) >>> 0
+      return numToIp(rangeEnd) + '/' + minPrefix
     }
-    // 192.168.x → use 172.16.0.0/X
-    return '172.16.0.0/' + minPrefix
+    // 192.168.x → end of 172.16.0.0/12
+    const rangeEnd = (ipToNum('172.31.255.252') - blockSize + 4) >>> 0
+    return numToIp(rangeEnd) + '/' + minPrefix
   }
 
   return ''
+}
+
+// ---------------------------------------------------------------------------
+// Manual Tunnel Helpers
+// ---------------------------------------------------------------------------
+
+/** Check whether two CIDR ranges overlap */
+export function cidrsOverlap(cidrA: string, cidrB: string): boolean {
+  const [ipA, pA] = cidrA.split('/')
+  const [ipB, pB] = cidrB.split('/')
+  const prefixA = parseInt(pA, 10)
+  const prefixB = parseInt(pB, 10)
+  const numA = ipToNum(ipA)
+  const numB = ipToNum(ipB)
+  const shorter = Math.min(prefixA, prefixB)
+  const mask = shorter === 0 ? 0 : (0xffffffff << (32 - shorter)) >>> 0
+  return (numA & mask) === (numB & mask)
+}
+
+/** Compute the two endpoint IPs for a manual /30 or /31 tunnel subnet */
+export function computeManualTunnelIPs(cidr: string): { ipA: string; ipB: string } | null {
+  const [ip, pStr] = cidr.split('/')
+  const prefix = parseInt(pStr, 10)
+  if (prefix !== 30 && prefix !== 31) return null
+  const netNum = ipToNum(ip)
+  if (prefix === 31) {
+    return { ipA: numToIp(netNum), ipB: numToIp(netNum + 1) }
+  }
+  // /30: network+1 and network+2
+  return { ipA: numToIp(netNum + 1), ipB: numToIp(netNum + 2) }
+}
+
+/** Validate a manual tunnel CIDR. Returns error string or null if valid. */
+export function validateManualTunnel(
+  cidr: string,
+  addressPlan: WizardAddressEntry[],
+  existingTunnels: WizardTunnelEntry[],
+): string | null {
+  // Basic CIDR format check
+  if (!cidr || !cidr.includes('/')) return 'Enter a CIDR (e.g. 10.0.0.0/30)'
+  const [ip, pStr] = cidr.split('/')
+  const octets = ip.split('.')
+  if (octets.length !== 4) return 'Invalid IP format — need 4 octets'
+  for (const o of octets) {
+    const n = Number(o)
+    if (!Number.isInteger(n) || n < 0 || n > 255) return `Invalid octet: ${o}`
+  }
+  const prefix = parseInt(pStr, 10)
+  if (isNaN(prefix) || prefix < 0 || prefix > 32) return 'Invalid prefix length'
+
+  // Must be /30 or /31
+  if (prefix !== 30 && prefix !== 31) return 'Prefix must be /30 or /31'
+
+  // Network alignment check
+  const netNum = ipToNum(ip)
+  const hostBits = 32 - prefix
+  const aligned = (netNum & ((0xffffffff << hostBits) >>> 0)) >>> 0
+  if (netNum !== aligned) {
+    return `Not a valid network address. Did you mean ${numToIp(aligned)}/${prefix}?`
+  }
+
+  // Overlap with address plan subnets
+  for (const entry of addressPlan) {
+    if (cidrsOverlap(cidr, entry.subnet)) {
+      return `Overlaps with address plan subnet ${entry.subnet}`
+    }
+  }
+
+  // Overlap with existing tunnel subnets
+  for (const t of existingTunnels) {
+    if (cidrsOverlap(cidr, t.tunnelSubnet)) {
+      return `Overlaps with existing tunnel ${t.name} (${t.tunnelSubnet})`
+    }
+  }
+
+  return null
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,9 @@ export interface WizardSite {
   tempId: string
   name: string
   address: string
+  supernet: string
+  latitude: number | null
+  longitude: number | null
 }
 
 export interface WizardVlanTemplate {
@@ -75,6 +78,7 @@ export interface WizardState {
 
   // Step 2: Sites
   sites: WizardSite[]
+  siteSupernetsEnabled: boolean
 
   // Step 3: VLAN Template
   vlanTemplates: WizardVlanTemplate[]
@@ -92,10 +96,11 @@ export interface WizardState {
   addressPlan: WizardAddressEntry[]
 
   // Step 5: Tunnels
-  tunnelMode: 'none' | 'full-mesh' | 'hub-spoke'
+  tunnelMode: 'none' | 'full-mesh' | 'hub-spoke' | 'manual'
   tunnelType: TunnelType
   hubSiteTempId?: string
   tunnelAllocMode: 'from-supernet' | 'separate' | 'manual'
+  tunnelAllocStart: 'start' | 'end'
   tunnelPointToPointPrefix: 30 | 31
   tunnelSubnetBase: string
   tunnelPlan: WizardTunnelEntry[]
@@ -107,6 +112,7 @@ export const initialWizardState: WizardState = {
   projectDescription: '',
   supernet: '',
   sites: [],
+  siteSupernetsEnabled: false,
   vlanTemplates: [],
   perSiteOverrides: {},
   vlanNumbering: 'same',
@@ -120,6 +126,7 @@ export const initialWizardState: WizardState = {
   tunnelMode: 'none',
   tunnelType: 'wireguard',
   tunnelAllocMode: 'from-supernet',
+  tunnelAllocStart: 'end',
   tunnelPointToPointPrefix: 30,
   tunnelSubnetBase: '',
   tunnelPlan: [],

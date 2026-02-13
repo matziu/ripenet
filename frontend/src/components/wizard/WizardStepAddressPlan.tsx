@@ -4,6 +4,7 @@ import { toolsApi } from '@/api/endpoints'
 import type { WizardState, VLSMResult, VLSMAllocation } from '@/lib/wizard.types'
 import {
   buildVlsmRequirements,
+  buildVlsmRequirementsBySupernet,
   buildAddressPlan,
   buildVlanAlignedPlan,
   validateVlanAligned,
@@ -14,6 +15,8 @@ import {
   computeSubnetDetails,
   computeSiteSummaryRoutes,
   getVlanIdForSite,
+  getSiteSupernet,
+  hasMixedSupernets,
 } from '@/lib/wizard.utils'
 
 interface Props {
@@ -35,6 +38,7 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
   const [error, setError] = useState<string | null>(null)
 
   const mode = state.addressingMode
+  const mixed = hasMixedSupernets(state)
 
   const validationErrors = (() => {
     switch (mode) {
@@ -50,11 +54,35 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
       setLoading(true)
       setError(null)
       try {
-        const requirements = buildVlsmRequirements(state)
-        const res = await toolsApi.vlsm(state.supernet, requirements)
-        const vlsmResult = res.data as VLSMResult
-        const addressPlan = buildAddressPlan(state, vlsmResult)
-        onChange({ vlsmResult, addressPlan })
+        if (mixed) {
+          // Multi-supernet VLSM: call vlsm per supernet group, merge results
+          const groups = buildVlsmRequirementsBySupernet(state)
+          const allAllocations: VLSMAllocation[] = []
+          const allRemaining: string[] = []
+          let mergedParent = state.supernet
+
+          for (const [supernet, reqs] of groups) {
+            const res = await toolsApi.vlsm(supernet, reqs)
+            const result = res.data as VLSMResult
+            allAllocations.push(...result.allocations)
+            allRemaining.push(...result.remaining)
+            mergedParent = supernet // last one, for display
+          }
+
+          const vlsmResult: VLSMResult = {
+            parent: mergedParent,
+            allocations: allAllocations,
+            remaining: allRemaining,
+          }
+          const addressPlan = buildAddressPlan(state, vlsmResult)
+          onChange({ vlsmResult, addressPlan })
+        } else {
+          const requirements = buildVlsmRequirements(state)
+          const res = await toolsApi.vlsm(state.supernet, requirements)
+          const vlsmResult = res.data as VLSMResult
+          const addressPlan = buildAddressPlan(state, vlsmResult)
+          onChange({ vlsmResult, addressPlan })
+        }
       } catch (err: unknown) {
         const msg =
           err && typeof err === 'object' && 'response' in err
@@ -123,6 +151,23 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
         </p>
       </div>
 
+      {/* Per-site supernet info */}
+      {mixed && (
+        <div className="rounded-md border border-blue-500/30 bg-blue-500/5 px-4 py-3 text-sm space-y-1">
+          <span className="font-medium">Per-site supernets active:</span>
+          {state.sites.map((site) => {
+            const sn = getSiteSupernet(state, site.tempId)
+            const isOverride = site.supernet?.trim() && site.supernet.trim() !== state.supernet
+            return (
+              <div key={site.tempId} className="text-muted-foreground">
+                {site.name}: <span className="font-mono text-xs">{sn}</span>
+                {isOverride && <span className="text-blue-500 ml-1">(override)</span>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Mode toggle — 2x2 grid */}
       <div className="grid grid-cols-2 gap-3">
         {MODE_INFO.map(({ mode: m, label, desc }) => (
@@ -162,7 +207,8 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
             <div className="text-xs text-muted-foreground space-y-0.5">
               <span className="font-medium">Addressing scheme:</span>
               {state.sites.map((site, idx) => {
-                const [ipStr] = state.supernet.split('/')
+                const effectiveSupernet = getSiteSupernet(state, site.tempId)
+                const [ipStr] = effectiveSupernet.split('/')
                 const parts = ipStr.split('.').map(Number)
                 const baseNum = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
                 const base16 = baseNum & 0xffff0000
@@ -204,7 +250,8 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
             <div className="text-xs text-muted-foreground space-y-0.5">
               <span className="font-medium">Addressing scheme:</span>
               {state.sites.map((site, idx) => {
-                const firstOctet = parseInt(state.supernet.split('.')[0], 10)
+                const effectiveSupernet = getSiteSupernet(state, site.tempId)
+                const firstOctet = parseInt(effectiveSupernet.split('.')[0], 10)
                 const firstTpl = state.vlanTemplates[0]
                 const vid = getVlanIdForSite(firstTpl.vlanId, idx, state)
                 return (
@@ -237,9 +284,25 @@ export function WizardStepAddressPlan({ state, onChange, onNext, onBack }: Props
 
           {validationErrors.length === 0 && (
             <div className="text-xs text-muted-foreground">
-              <span className="font-medium">Preview: </span>
-              subnets packed sequentially from <span className="font-mono">{state.supernet}</span>
-              {' '}as /{state.sequentialFixedPrefix} blocks
+              {mixed ? (
+                <div className="space-y-0.5">
+                  <span className="font-medium">Preview: </span>
+                  {state.sites.map((site) => {
+                    const sn = getSiteSupernet(state, site.tempId)
+                    return (
+                      <div key={site.tempId}>
+                        {site.name}: packed from <span className="font-mono">{sn}</span> as /{state.sequentialFixedPrefix} blocks
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <>
+                  <span className="font-medium">Preview: </span>
+                  subnets packed sequentially from <span className="font-mono">{state.supernet}</span>
+                  {' '}as /{state.sequentialFixedPrefix} blocks
+                </>
+              )}
             </div>
           )}
         </div>
