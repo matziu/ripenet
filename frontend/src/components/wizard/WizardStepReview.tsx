@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { projectsApi, sitesApi, vlansApi, subnetsApi, tunnelsApi } from '@/api/endpoints'
 import type { WizardState } from '@/lib/wizard.types'
-import { getVlanIdForSite, getSiteSupernet } from '@/lib/wizard.utils'
+import { getVlanIdForSite } from '@/lib/wizard.utils'
 
 interface Props {
   state: WizardState
@@ -40,13 +40,21 @@ export function WizardStepReview({ state, onBack }: Props) {
 
   const getSiteName = (tempId: string) =>
     state.sites.find((s) => s.tempId === tempId)?.name ?? tempId
-  const getVlanTemplate = (tempId: string) =>
-    state.vlanTemplates.find((t) => t.tempId === tempId)
+
+  const getVlanInfo = (vlanTempId: string, siteTempId: string) => {
+    if (state.vlanMode === 'manual') {
+      return state.perSiteVlans[siteTempId]?.find((v) => v.tempId === vlanTempId)
+    }
+    return state.vlanTemplates.find((t) => t.tempId === vlanTempId)
+  }
+
+  const newSites = state.sites.filter((s) => !s.realId)
+  const newAddressEntries = state.addressPlan.filter((e) => !e.realSubnetId)
 
   const totalEntities =
     (state.projectMode === 'new' ? 1 : 0) +
-    state.sites.length +
-    state.addressPlan.length * 2 + // VLANs + subnets
+    newSites.length +
+    newAddressEntries.length * 2 + // VLANs + subnets
     state.tunnelPlan.length
 
   const createAll = async () => {
@@ -63,11 +71,14 @@ export function WizardStepReview({ state, onBack }: Props) {
         projectId = res.data.id
       }
 
-      // 2. Sites
+      // 2. Sites — skip existing ones (realId set)
       const siteIdMap = new Map<string, number>()
-      setProgress({ phase: 'sites', current: 0, total: state.sites.length })
-      for (let i = 0; i < state.sites.length; i++) {
-        const site = state.sites[i]
+      for (const site of state.sites) {
+        if (site.realId) siteIdMap.set(site.tempId, site.realId)
+      }
+      setProgress({ phase: 'sites', current: 0, total: newSites.length })
+      for (let i = 0; i < newSites.length; i++) {
+        const site = newSites[i]
         const res = await sitesApi.create(projectId, {
           name: site.name,
           address: site.address,
@@ -76,42 +87,69 @@ export function WizardStepReview({ state, onBack }: Props) {
           longitude: site.longitude,
         })
         siteIdMap.set(site.tempId, res.data.id)
-        setProgress({ phase: 'sites', current: i + 1, total: state.sites.length })
+        setProgress({ phase: 'sites', current: i + 1, total: newSites.length })
       }
 
-      // 3. VLANs — use per-site VLAN IDs + name overrides
+      // 3. VLANs — skip existing ones (realVlanId set), create new
       const vlanIdMap = new Map<string, number>() // key: "siteTempId:vlanTempId"
-      const vlanEntries = state.addressPlan
-      setProgress({ phase: 'vlans', current: 0, total: vlanEntries.length })
-      for (let i = 0; i < vlanEntries.length; i++) {
-        const entry = vlanEntries[i]
+      // Pre-populate map with existing VLANs
+      for (const entry of state.addressPlan) {
+        if (entry.realVlanId) {
+          vlanIdMap.set(`${entry.siteTempId}:${entry.vlanTempId}`, entry.realVlanId)
+        }
+      }
+      setProgress({ phase: 'vlans', current: 0, total: newAddressEntries.length })
+      for (let i = 0; i < newAddressEntries.length; i++) {
+        const entry = newAddressEntries[i]
+        // Skip if we already have a real VLAN ID for this combination
+        const mapKey = `${entry.siteTempId}:${entry.vlanTempId}`
+        if (vlanIdMap.has(mapKey)) {
+          setProgress({ phase: 'vlans', current: i + 1, total: newAddressEntries.length })
+          continue
+        }
+
         const realSiteId = siteIdMap.get(entry.siteTempId)!
-        const tpl = getVlanTemplate(entry.vlanTempId)!
         const siteIdx = state.sites.findIndex((s) => s.tempId === entry.siteTempId)
-        const tplIdx = state.vlanTemplates.findIndex((t) => t.tempId === entry.vlanTempId)
-        const override = state.perSiteOverrides[entry.siteTempId]?.[tplIdx]
-        const effectiveVlanId = getVlanIdForSite(tpl.vlanId, siteIdx, state)
+
+        let effectiveVlanId: number
+        let effectiveName: string
+        let effectivePurpose: string
+
+        if (state.vlanMode === 'manual') {
+          const mv = state.perSiteVlans[entry.siteTempId]?.find((v) => v.tempId === entry.vlanTempId)
+          effectiveVlanId = mv?.vlanId ?? 0
+          effectiveName = mv?.name ?? ''
+          effectivePurpose = mv?.purpose ?? ''
+        } else {
+          const tpl = state.vlanTemplates.find((t) => t.tempId === entry.vlanTempId)!
+          const tplIdx = state.vlanTemplates.findIndex((t) => t.tempId === entry.vlanTempId)
+          const override = state.perSiteOverrides[entry.siteTempId]?.[tplIdx]
+          effectiveVlanId = getVlanIdForSite(tpl.vlanId, siteIdx, state)
+          effectiveName = override?.name || tpl.name
+          effectivePurpose = tpl.purpose
+        }
+
         const res = await vlansApi.create({
           site: realSiteId,
           vlan_id: effectiveVlanId,
-          name: override?.name || tpl.name,
-          purpose: tpl.purpose,
+          name: effectiveName,
+          purpose: effectivePurpose,
         })
-        vlanIdMap.set(`${entry.siteTempId}:${entry.vlanTempId}`, res.data.id)
-        setProgress({ phase: 'vlans', current: i + 1, total: vlanEntries.length })
+        vlanIdMap.set(mapKey, res.data.id)
+        setProgress({ phase: 'vlans', current: i + 1, total: newAddressEntries.length })
       }
 
-      // 4. Subnets
-      setProgress({ phase: 'subnets', current: 0, total: vlanEntries.length })
-      for (let i = 0; i < vlanEntries.length; i++) {
-        const entry = vlanEntries[i]
+      // 4. Subnets — skip existing ones (realSubnetId set)
+      setProgress({ phase: 'subnets', current: 0, total: newAddressEntries.length })
+      for (let i = 0; i < newAddressEntries.length; i++) {
+        const entry = newAddressEntries[i]
         const realVlanId = vlanIdMap.get(`${entry.siteTempId}:${entry.vlanTempId}`)!
         await subnetsApi.create({
           vlan: realVlanId,
           network: entry.subnet,
           gateway: entry.gateway,
         })
-        setProgress({ phase: 'subnets', current: i + 1, total: vlanEntries.length })
+        setProgress({ phase: 'subnets', current: i + 1, total: newAddressEntries.length })
       }
 
       // 5. Tunnels
@@ -138,10 +176,18 @@ export function WizardStepReview({ state, onBack }: Props) {
       toast.success('Network design created successfully!')
       setTimeout(() => navigate(`/projects/${projectId}`), 800)
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? String((err as { response: { data: { detail?: string } } }).response?.data?.detail ?? 'Creation failed')
-          : 'Creation failed'
+      let msg = 'Creation failed'
+      if (err && typeof err === 'object' && 'response' in err) {
+        const resp = (err as { response: { data: unknown; status: number } }).response
+        const data = resp?.data
+        if (data && typeof data === 'object' && 'detail' in data) {
+          msg = String((data as { detail: string }).detail)
+        } else if (data) {
+          msg = `${resp.status}: ${JSON.stringify(data).slice(0, 300)}`
+        }
+      } else if (err instanceof Error) {
+        msg = err.message
+      }
       setProgress((p) => ({ ...p, phase: 'error', error: msg }))
       toast.error(msg)
     }
@@ -154,7 +200,10 @@ export function WizardStepReview({ state, onBack }: Props) {
       <div>
         <h2 className="text-lg font-semibold mb-1">Review & Create</h2>
         <p className="text-sm text-muted-foreground">
-          Review your network design before creating {totalEntities} entities.
+          Review your network design{totalEntities > 0 ? ` before creating ${totalEntities} new entit${totalEntities === 1 ? 'y' : 'ies'}` : ''}.
+          {state.addressPlan.length > newAddressEntries.length && (
+            <> {state.addressPlan.length - newAddressEntries.length} existing entit{state.addressPlan.length - newAddressEntries.length === 1 ? 'y' : 'ies'} will be preserved.</>
+          )}
         </p>
       </div>
 
@@ -174,7 +223,7 @@ export function WizardStepReview({ state, onBack }: Props) {
         {/* Sites */}
         <div className="p-4">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            Sites ({state.sites.length})
+            Sites ({state.sites.length}{newSites.length < state.sites.length ? `, ${newSites.length} new` : ''})
           </h3>
           <div className="flex flex-wrap gap-2">
             {state.sites.map((s) => {
@@ -185,6 +234,9 @@ export function WizardStepReview({ state, onBack }: Props) {
                   className="rounded-md bg-muted px-2 py-1 text-sm"
                 >
                   {s.name}
+                  {s.realId && (
+                    <span className="ml-1 text-xs text-muted-foreground">(existing)</span>
+                  )}
                   {hasOverride && (
                     <span className="ml-1 font-mono text-xs text-blue-500">
                       ({s.supernet.trim()})
@@ -204,26 +256,33 @@ export function WizardStepReview({ state, onBack }: Props) {
         {/* Address Plan */}
         <div className="p-4">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            VLANs & Subnets ({state.addressPlan.length})
+            VLANs & Subnets ({state.addressPlan.length}{newAddressEntries.length < state.addressPlan.length ? `, ${newAddressEntries.length} new` : ''})
           </h3>
           <div className="space-y-1 text-sm">
-            {state.sites.map((site) => {
-              const siteIdx = state.sites.indexOf(site)
+            {state.sites.map((site, siteIdx) => {
               const siteEntries = state.addressPlan.filter((e) => e.siteTempId === site.tempId)
               if (siteEntries.length === 0) return null
               return (
                 <div key={site.tempId}>
                   <span className="font-medium">{site.name}:</span>{' '}
                   {siteEntries.map((e, i) => {
-                    const tpl = getVlanTemplate(e.vlanTempId)
-                    const vid = tpl ? getVlanIdForSite(tpl.vlanId, siteIdx, state) : '?'
-                    const tplIdx = state.vlanTemplates.findIndex((t) => t.tempId === e.vlanTempId)
-                    const overrideName = state.perSiteOverrides[site.tempId]?.[tplIdx]?.name
-                    const displayName = overrideName || tpl?.name
+                    const vlan = getVlanInfo(e.vlanTempId, site.tempId)
+                    let vid: number | string = '?'
+                    let displayName = ''
+                    if (state.vlanMode === 'manual' && vlan) {
+                      vid = vlan.vlanId
+                      displayName = vlan.name
+                    } else if (vlan) {
+                      vid = getVlanIdForSite(vlan.vlanId, siteIdx, state)
+                      const tplIdx = state.vlanTemplates.findIndex((t) => t.tempId === e.vlanTempId)
+                      const overrideName = state.perSiteOverrides[site.tempId]?.[tplIdx]?.name
+                      displayName = overrideName || vlan.name
+                    }
                     return (
                       <span key={i} className="text-muted-foreground">
                         {i > 0 && ', '}
                         VLAN {vid} {displayName} <span className="font-mono text-xs">{e.subnet}</span>
+                        {e.realSubnetId && <span className="text-xs ml-1">(existing)</span>}
                       </span>
                     )
                   })}
@@ -264,7 +323,7 @@ export function WizardStepReview({ state, onBack }: Props) {
             )}
             <span className="font-medium">
               {progress.phase === 'done'
-                ? 'All entities created!'
+                ? (totalEntities > 0 ? 'All entities created!' : 'Done — nothing new to create.')
                 : progress.phase === 'error'
                   ? `Error: ${progress.error}`
                   : `Creating ${progress.phase}... ${progress.current}/${progress.total}`}

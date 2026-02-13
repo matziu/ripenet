@@ -7,6 +7,7 @@ export interface WizardSite {
   supernet: string
   latitude: number | null
   longitude: number | null
+  realId?: number
 }
 
 export interface WizardVlanTemplate {
@@ -21,6 +22,15 @@ export interface WizardSiteOverride {
   skip?: boolean
   hostsNeeded?: number
   name?: string
+}
+
+export interface WizardManualVlan {
+  tempId: string
+  vlanId: number
+  name: string
+  purpose: string
+  hostsNeeded: number
+  realId?: number
 }
 
 export interface VlanPreset {
@@ -43,6 +53,8 @@ export interface WizardAddressEntry {
   vlanTempId: string
   subnet: string
   gateway: string
+  realSubnetId?: number
+  realVlanId?: number
 }
 
 export interface WizardTunnelEntry {
@@ -81,15 +93,18 @@ export interface WizardState {
   siteSupernetsEnabled: boolean
 
   // Step 3: VLAN Template
+  vlanMode: 'template' | 'manual'
   vlanTemplates: WizardVlanTemplate[]
   perSiteOverrides: Record<string, WizardSiteOverride[]>
+  perSiteVlans: Record<string, WizardManualVlan[]>
   vlanNumbering: 'same' | 'per-site'
   vlanStartId: number
   vlanStep: number
   vlanSiteOffset: number      // per-site mode: offset between sites (e.g. 100)
 
   // Step 4: Address Plan
-  addressingMode: 'vlsm' | 'vlan-aligned' | 'site-in-octet' | 'sequential-fixed'
+  addressingMode: 'vlsm' | 'vlan-aligned' | 'site-in-octet' | 'sequential-fixed' | 'manual'
+  perSiteAddressingMode: Record<string, 'vlsm' | 'vlan-aligned' | 'site-in-octet' | 'sequential-fixed' | 'manual'>
   vlanAlignedPrefix: number    // subnet prefix for vlan-aligned mode (default 24)
   sequentialFixedPrefix: number // subnet prefix for sequential-fixed mode (default 24)
   vlsmResult?: VLSMResult
@@ -113,13 +128,16 @@ export const initialWizardState: WizardState = {
   supernet: '',
   sites: [],
   siteSupernetsEnabled: false,
+  vlanMode: 'template',
   vlanTemplates: [],
   perSiteOverrides: {},
+  perSiteVlans: {},
   vlanNumbering: 'same',
   vlanStartId: 10,
   vlanStep: 10,
   vlanSiteOffset: 100,
   addressingMode: 'vlsm',
+  perSiteAddressingMode: {},
   vlanAlignedPrefix: 24,
   sequentialFixedPrefix: 24,
   addressPlan: [],

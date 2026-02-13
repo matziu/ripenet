@@ -46,9 +46,9 @@ export function ProjectPage() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
-      if (e.key === '1') navigate(`/projects/${id}/topology`, { replace: true })
-      else if (e.key === '2') navigate(`/projects/${id}/geo`, { replace: true })
-      else if (e.key === '3') navigate(`/projects/${id}/table/network`, { replace: true })
+      if (e.key === '1') navigate(`/projects/${id}/table/network`, { replace: true })
+      else if (e.key === '2') navigate(`/projects/${id}/topology`, { replace: true })
+      else if (e.key === '3') navigate(`/projects/${id}/geo`, { replace: true })
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)

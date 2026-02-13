@@ -72,7 +72,7 @@ export function CommandPalette() {
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
       <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
       <Command
-        className="relative w-full max-w-lg rounded-xl border border-border bg-popover shadow-2xl"
+        className="relative w-full max-w-lg rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl"
         shouldFilter={false}
       >
         <div className="flex items-center border-b border-border px-3">

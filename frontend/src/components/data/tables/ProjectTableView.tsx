@@ -13,7 +13,7 @@ import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { cn } from '@/lib/utils'
 import {
   Plus, Pencil, Trash2,
-  Building2, Network, Server, ChevronDown, ChevronRight,
+  Building2, Network, Server, ChevronDown, ChevronRight, MapPin, Wand2,
 } from 'lucide-react'
 import type { TableTab } from '@/pages/ProjectPage'
 import type { Site, VLAN, Subnet, Host, Tunnel } from '@/types'
@@ -81,6 +81,7 @@ export function ProjectTableView({ projectId, activeTab }: ProjectTableViewProps
 // ─── Network Hierarchy ────────────────────────────────────────
 
 function NetworkHierarchy({ projectId }: { projectId: number }) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   // Fetch all entities
@@ -385,8 +386,32 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
             })}
             {tree.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                  No sites yet. Add your first site to start building the network hierarchy.
+                <td colSpan={4} className="px-4 py-12">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+                      <MapPin className="h-7 w-7 text-muted-foreground" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium">No sites yet</p>
+                      <p className="text-sm text-muted-foreground mt-1">Add your first site or use the wizard for a complete design.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setDialog({ type: 'site', mode: 'add' })}
+                        className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Site
+                      </button>
+                      <button
+                        onClick={() => navigate(`/wizard`)}
+                        className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
+                      >
+                        <Wand2 className="h-4 w-4" />
+                        Design Wizard
+                      </button>
+                    </div>
+                  </div>
                 </td>
               </tr>
             )}

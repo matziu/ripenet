@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi } from '@/api/endpoints'
@@ -13,29 +14,42 @@ interface SiteFormProps {
 interface FormValues {
   name: string
   address: string
-  latitude: string
-  longitude: string
+}
+
+const COORDS_RE = /^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/
+
+function formatCoords(lat: number | null, lng: number | null) {
+  return lat != null && lng != null ? `${lat}, ${lng}` : ''
 }
 
 export function SiteForm({ projectId, site, onClose }: SiteFormProps) {
   const queryClient = useQueryClient()
+  const [coords, setCoords] = useState({ lat: site?.latitude ?? null, lng: site?.longitude ?? null })
+  const [coordsInput, setCoordsInput] = useState(formatCoords(site?.latitude ?? null, site?.longitude ?? null))
 
   const { register, handleSubmit } = useForm<FormValues>({
     defaultValues: site ? {
       name: site.name,
       address: site.address,
-      latitude: site.latitude?.toString() ?? '',
-      longitude: site.longitude?.toString() ?? '',
     } : {},
   })
+
+  const parseCoords = (raw: string) => {
+    const match = COORDS_RE.exec(raw)
+    if (match) {
+      setCoords({ lat: parseFloat(match[1]), lng: parseFloat(match[2]) })
+    } else if (raw.trim() === '') {
+      setCoords({ lat: null, lng: null })
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
       const payload = {
         name: data.name,
         address: data.address,
-        latitude: data.latitude ? parseFloat(data.latitude) : null,
-        longitude: data.longitude ? parseFloat(data.longitude) : null,
+        latitude: coords.lat,
+        longitude: coords.lng,
       }
       return site
         ? sitesApi.update(projectId, site.id, payload)
@@ -73,23 +87,23 @@ export function SiteForm({ projectId, site, onClose }: SiteFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium">Latitude</label>
-          <input
-            {...register('latitude')}
-            placeholder="e.g. 52.2297"
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium">Longitude</label>
-          <input
-            {...register('longitude')}
-            placeholder="e.g. 21.0122"
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
-          />
-        </div>
+      <div>
+        <label className="text-xs font-medium">Coordinates</label>
+        <input
+          value={coordsInput}
+          onChange={(e) => setCoordsInput(e.target.value)}
+          onBlur={(e) => parseCoords(e.target.value)}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData('text')
+            if (COORDS_RE.test(text)) {
+              e.preventDefault()
+              setCoordsInput(text.trim())
+              parseCoords(text)
+            }
+          }}
+          placeholder="e.g. 52.2297, 21.0122  (paste from Google Maps)"
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
+        />
       </div>
 
       <div className="flex gap-2 pt-2">

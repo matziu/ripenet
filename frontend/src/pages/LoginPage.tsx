@@ -38,7 +38,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-lg"
+        className="w-full max-w-sm rounded-xl border border-border bg-card text-card-foreground p-6 shadow-lg"
       >
         <h1 className="text-xl font-bold mb-1">RIPE-NET</h1>
         <p className="text-sm text-muted-foreground mb-6">IP Address Management</p>

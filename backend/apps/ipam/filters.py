@@ -1,6 +1,6 @@
 import django_filters
 
-from .models import Host, Subnet, VLAN
+from .models import Host, Subnet, Tunnel, VLAN
 
 
 class VLANFilter(django_filters.FilterSet):
@@ -20,6 +20,14 @@ class SubnetFilter(django_filters.FilterSet):
     class Meta:
         model = Subnet
         fields = ["project", "site", "vlan"]
+
+
+class TunnelFilter(django_filters.FilterSet):
+    project = django_filters.NumberFilter(field_name="project_id")
+
+    class Meta:
+        model = Tunnel
+        fields = ["project", "tunnel_type", "status"]
 
 
 class HostFilter(django_filters.FilterSet):

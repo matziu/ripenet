@@ -217,7 +217,12 @@ export function WizardStepTunnels({ state, onChange, onNext, onBack }: Props) {
                 onClick={() => {
                   // Clear tunnelPlan when switching to/from manual to prevent mixing entries
                   const clearPlan = value === 'none' || value === 'manual' || state.tunnelMode === 'manual'
-                  onChange({ tunnelMode: value, tunnelPlan: clearPlan ? [] : state.tunnelPlan })
+                  const patch: Partial<WizardState> = { tunnelMode: value, tunnelPlan: clearPlan ? [] : state.tunnelPlan }
+                  // Auto-select first site as hub when switching to hub-spoke
+                  if (value === 'hub-spoke' && !state.hubSiteTempId && state.sites.length > 0) {
+                    patch.hubSiteTempId = state.sites[0].tempId
+                  }
+                  onChange(patch)
                 }}
                 className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors flex flex-col items-center ${
                   state.tunnelMode === value
@@ -250,7 +255,7 @@ export function WizardStepTunnels({ state, onChange, onNext, onBack }: Props) {
 
                 {state.tunnelMode === 'hub-spoke' && (
                   <div>
-                    <label className="text-xs font-medium">Hub Site</label>
+                    <label className="text-xs font-medium">Hub Site <span className="text-red-500">*</span></label>
                     <select
                       value={state.hubSiteTempId ?? ''}
                       onChange={(e) => onChange({ hubSiteTempId: e.target.value })}
@@ -392,7 +397,7 @@ export function WizardStepTunnels({ state, onChange, onNext, onBack }: Props) {
                   </h3>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="text-xs font-medium">Site A</label>
+                      <label className="text-xs font-medium">Site A <span className="text-red-500">*</span></label>
                       <select
                         value={manualSiteA}
                         onChange={(e) => { setManualSiteA(e.target.value); setManualError(null) }}
@@ -405,7 +410,7 @@ export function WizardStepTunnels({ state, onChange, onNext, onBack }: Props) {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-medium">Site B</label>
+                      <label className="text-xs font-medium">Site B <span className="text-red-500">*</span></label>
                       <select
                         value={manualSiteB}
                         onChange={(e) => { setManualSiteB(e.target.value); setManualError(null) }}
@@ -418,7 +423,7 @@ export function WizardStepTunnels({ state, onChange, onNext, onBack }: Props) {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-medium">Tunnel Subnet</label>
+                      <label className="text-xs font-medium">Tunnel Subnet <span className="text-red-500">*</span></label>
                       <input
                         value={manualCidr}
                         onChange={(e) => { setManualCidr(e.target.value); setManualError(null) }}

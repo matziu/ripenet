@@ -60,12 +60,11 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
   }
 
   const valid =
-    state.supernet.trim() !== '' &&
-    CIDR_RE.test(state.supernet.trim()) &&
     state.sites.length >= 1 &&
     state.sites.every((s) => s.name.trim() !== '') &&
-    (!state.siteSupernetsEnabled ||
-      state.sites.every((s) => !s.supernet.trim() || CIDR_RE.test(s.supernet.trim())))
+    (state.siteSupernetsEnabled
+      ? state.sites.every((s) => s.supernet.trim() !== '' && CIDR_RE.test(s.supernet.trim()))
+      : state.supernet.trim() !== '' && CIDR_RE.test(state.supernet.trim()))
 
   return (
     <div className="space-y-6">
@@ -78,7 +77,7 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
       </div>
 
       <div>
-        <label className="text-xs font-medium">Supernet CIDR</label>
+        <label className="text-xs font-medium">Supernet CIDR {!state.siteSupernetsEnabled && <span className="text-red-500">*</span>}</label>
         <input
           value={state.supernet}
           onChange={(e) => onChange({ supernet: e.target.value })}
@@ -96,7 +95,7 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
 
       <div className="space-y-3">
         {state.sites.map((site, idx) => (
-          <div key={site.tempId} className="space-y-1">
+          <div key={site.tempId}>
             <div className="flex items-start gap-2">
               <span className="mt-2 text-xs text-muted-foreground w-6 text-right shrink-0">
                 {idx + 1}.
@@ -104,16 +103,16 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
               <input
                 value={site.name}
                 onChange={(e) => updateSite(site.tempId, 'name', e.target.value)}
-                placeholder="Site name (e.g. HQ)"
-                className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                placeholder="Site name *"
+                className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
               />
               <input
                 value={site.address}
                 onChange={(e) => updateSite(site.tempId, 'address', e.target.value)}
-                placeholder="Physical address (e.g. ul. Marszałkowska 1, Warszawa)"
-                className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                placeholder="Address"
+                className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
               />
-              <div className="relative">
+              <div className="relative shrink-0">
                 <input
                   defaultValue={coordsDisplayText(site)}
                   key={`${site.tempId}-${site.latitude}-${site.longitude}`}
@@ -127,7 +126,7 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
                     }
                   }}
                   placeholder="52.260, 20.921"
-                  className="w-48 rounded-md border border-input bg-background pl-3 pr-7 py-1.5 text-sm font-mono"
+                  className="w-40 rounded-md border border-input bg-background pl-3 pr-7 py-1.5 text-sm font-mono"
                 />
                 <MapPin
                   className={`absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${
@@ -141,18 +140,20 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
                 <input
                   value={site.supernet}
                   onChange={(e) => updateSite(site.tempId, 'supernet', e.target.value)}
-                  placeholder={state.supernet || 'Inherit from project'}
-                  className={`w-44 rounded-md border bg-background px-3 py-1.5 text-sm font-mono ${
+                  placeholder="Supernet *"
+                  className={`w-40 shrink-0 rounded-md border bg-background px-3 py-1.5 text-sm font-mono ${
                     site.supernet.trim() && !CIDR_RE.test(site.supernet.trim())
                       ? 'border-destructive'
-                      : 'border-input'
+                      : !site.supernet.trim()
+                        ? 'border-destructive/50'
+                        : 'border-input'
                   }`}
                 />
               )}
               <button
                 type="button"
                 onClick={() => removeSite(site.tempId)}
-                className="p-1.5 rounded hover:bg-destructive/10 mt-0.5"
+                className="p-1.5 rounded hover:bg-destructive/10 mt-0.5 shrink-0"
                 title="Remove"
               >
                 <Trash2 className="h-4 w-4 text-muted-foreground" />
@@ -189,7 +190,7 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
 
       {state.siteSupernetsEnabled && (
         <p className="text-xs text-muted-foreground -mt-4">
-          Leave blank to inherit the project supernet. Sites with a custom supernet will use their own address space.
+          Each site requires its own supernet. The global supernet above becomes optional.
         </p>
       )}
 

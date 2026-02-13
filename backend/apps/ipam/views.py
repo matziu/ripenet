@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .filters import HostFilter, SubnetFilter, VLANFilter
+from .filters import HostFilter, SubnetFilter, TunnelFilter, VLANFilter
 from .models import VLAN, Host, Subnet, Tunnel
 from .permissions import ProjectPermission
 from .serializers import HostSerializer, SubnetSerializer, TunnelSerializer, VLANSerializer
@@ -79,6 +79,7 @@ class HostViewSet(viewsets.ModelViewSet):
 class TunnelViewSet(viewsets.ModelViewSet):
     serializer_class = TunnelSerializer
     permission_classes = [ProjectPermission]
+    filterset_class = TunnelFilter
     search_fields = ["name", "description"]
 
     def get_queryset(self):

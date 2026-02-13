@@ -25,7 +25,7 @@ export function DropdownMenu({ items }: DropdownMenuProps) {
       </DropdownMenuPrimitive.Trigger>
       <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.Content
-          className="z-50 min-w-[120px] rounded-md border border-border bg-card p-1 shadow-md"
+          className="z-50 min-w-[120px] rounded-md border border-border bg-card text-card-foreground p-1 shadow-md"
           align="end"
           sideOffset={4}
         >

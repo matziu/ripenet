@@ -17,7 +17,6 @@ class Migration(migrations.Migration):
             field=netfields.fields.CidrAddressField(
                 blank=True,
                 help_text="Override. Null = inherit from project.",
-                max_prefix_length=128,
                 null=True,
             ),
         ),

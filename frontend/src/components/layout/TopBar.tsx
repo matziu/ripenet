@@ -26,9 +26,9 @@ export function TopBar() {
       : 'topology'
 
   const viewButtons: { mode: 'topology' | 'geo' | 'table'; icon: typeof Network; label: string }[] = [
+    { mode: 'table', icon: Table, label: 'Table' },
     { mode: 'topology', icon: Network, label: 'Topology' },
     { mode: 'geo', icon: Map, label: 'Geo Map' },
-    { mode: 'table', icon: Table, label: 'Table' },
   ]
 
   const handleViewChange = (mode: 'topology' | 'geo' | 'table') => {

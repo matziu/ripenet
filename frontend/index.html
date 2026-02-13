@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RIPE-NET IPAM</title>
   </head>
-  <body class="bg-white dark:bg-gray-950">
+  <body class="bg-background text-foreground">
+    <script>if(localStorage.getItem('darkMode')==='true')document.documentElement.classList.add('dark')</script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
