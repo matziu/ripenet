@@ -4,7 +4,6 @@ import {
   ReactFlowProvider,
   Background,
   Controls,
-  MiniMap,
   Panel,
   useNodesState,
   useEdgesState,
@@ -129,12 +128,7 @@ function TopologyCanvasInner({ projectId }: TopologyCanvasProps) {
       className="bg-background"
     >
       <Background gap={20} size={1} />
-      <Controls className="!bg-card !border-border !shadow-md" />
-      <MiniMap
-        className="!bg-card !border-border"
-        nodeColor="#3b82f6"
-        maskColor="rgba(0, 0, 0, 0.1)"
-      />
+      <Controls className="!bg-card !border-border !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-accent [&>button>svg]:!fill-foreground" />
       <TopologyToolbar projectId={projectId} onRelayout={handleRelayout} />
     </ReactFlow>
   )
