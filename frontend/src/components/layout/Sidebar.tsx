@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { projectsApi, sitesApi, vlansApi, subnetsApi } from '@/api/endpoints'
+import { projectsApi, sitesApi, vlansApi, subnetsApi, hostsApi } from '@/api/endpoints'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
 import { cn } from '@/lib/utils'
@@ -10,10 +10,11 @@ import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
 import { SubnetForm } from '@/components/data/forms/SubnetForm'
+import { HostForm } from '@/components/data/forms/HostForm'
 import { toast } from 'sonner'
-import type { Site, VLAN, Subnet } from '@/types'
+import type { Site, VLAN, Subnet, Host } from '@/types'
 import {
-  FolderOpen, MapPin, Network, Server,
+  FolderOpen, MapPin, Network, Server, Monitor,
   ChevronRight, ChevronDown, Plus,
   Pencil, Trash2,
 } from 'lucide-react'
@@ -353,10 +354,12 @@ function VlanTreeItem({ vlan, siteId }: { vlan: VLAN; siteId: number }) {
   )
 }
 
-// ── Subnet (leaf) ────────────────────────────────────────────
+// ── Subnet ────────────────────────────────────────────────────
 
 function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) {
   const queryClient = useQueryClient()
+  const expanded = useSelectionStore((s) => s.expandedSubnetIds.has(subnet.id))
+  const toggleExpanded = useSelectionStore((s) => s.toggleExpandedSubnet)
   const selectedSubnetId = useSelectionStore((s) => s.selectedSubnetId)
   const setSelectedSubnet = useSelectionStore((s) => s.setSelectedSubnet)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
@@ -364,6 +367,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
   const isSelected = selectedSubnetId === subnet.id
 
   const [editOpen, setEditOpen] = useState(false)
+  const [addHostOpen, setAddHostOpen] = useState(false)
 
   const deleteMutation = useMutation({
     mutationFn: () => subnetsApi.delete(subnet.id),
@@ -374,14 +378,35 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
     },
   })
 
+  const { data: hostsData } = useQuery({
+    queryKey: ['hosts', { subnet: String(subnet.id) }],
+    queryFn: () => hostsApi.list({ subnet: String(subnet.id) }),
+    select: (res) => res.data.results,
+    enabled: expanded,
+  })
+
+  const hosts = hostsData ?? []
+
   const handleClick = () => {
     setSelectedSubnet(subnet.id)
     if (!detailPanelOpen) toggleDetailPanel()
   }
 
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    toggleExpanded(subnet.id)
+  }
+
   return (
     <div>
       <div className="group flex items-center">
+        <button onClick={handleToggle} className="p-0.5 shrink-0">
+          {expanded ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
+        </button>
         <button
           onClick={handleClick}
           className={cn(
@@ -395,6 +420,13 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
             {subnet.host_count}h
           </span>
         </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); setAddHostOpen(true) }}
+          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Add host"
+        >
+          <Plus className="h-3 w-3" />
+        </button>
         <DropdownMenu items={[
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
           { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
@@ -403,8 +435,78 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
         ]} />
       </div>
 
+      {expanded && hosts.length > 0 && (
+        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
+          {hosts.map((host) => (
+            <HostTreeItem key={host.id} host={host} subnetId={subnet.id} />
+          ))}
+        </div>
+      )}
+
       <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Subnet">
         <SubnetForm vlanId={vlanId} subnet={subnet} onClose={() => setEditOpen(false)} />
+      </Dialog>
+
+      <Dialog open={addHostOpen} onOpenChange={setAddHostOpen} title="Add Host">
+        <HostForm subnetId={subnet.id} onClose={() => setAddHostOpen(false)} />
+      </Dialog>
+    </div>
+  )
+}
+
+// ── Host (leaf) ──────────────────────────────────────────────
+
+function HostTreeItem({ host, subnetId }: { host: Host; subnetId: number }) {
+  const queryClient = useQueryClient()
+  const selectedHostId = useSelectionStore((s) => s.selectedHostId)
+  const setSelectedHost = useSelectionStore((s) => s.setSelectedHost)
+  const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
+  const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const isSelected = selectedHostId === host.id
+
+  const [editOpen, setEditOpen] = useState(false)
+
+  const deleteMutation = useMutation({
+    mutationFn: () => hostsApi.delete(host.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hosts'] })
+      queryClient.invalidateQueries({ queryKey: ['subnets'] })
+      queryClient.invalidateQueries({ queryKey: ['topology'] })
+      toast.success('Host deleted')
+    },
+  })
+
+  const handleClick = () => {
+    setSelectedHost(host.id)
+    if (!detailPanelOpen) toggleDetailPanel()
+  }
+
+  return (
+    <div>
+      <div className="group flex items-center">
+        <button
+          onClick={handleClick}
+          className={cn(
+            'flex flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors min-w-0',
+            isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
+          )}
+        >
+          <Monitor className="h-3 w-3 shrink-0" />
+          <span className="font-mono text-[11px] shrink-0">{host.ip_address}</span>
+          {host.hostname && (
+            <span className="truncate text-muted-foreground text-[10px]">{host.hostname}</span>
+          )}
+        </button>
+        <DropdownMenu items={[
+          { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
+          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
+            if (window.confirm(`Delete host ${host.ip_address}?`)) deleteMutation.mutate()
+          }},
+        ]} />
+      </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Host">
+        <HostForm subnetId={subnetId} host={host} onClose={() => setEditOpen(false)} />
       </Dialog>
     </div>
   )
