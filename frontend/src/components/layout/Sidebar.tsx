@@ -20,9 +20,10 @@ import {
 
 interface SidebarProps {
   className?: string
+  style?: React.CSSProperties
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, style }: SidebarProps) {
   const navigate = useNavigate()
   const { projectId } = useParams()
   const setSelectedProject = useSelectionStore((s) => s.setSelectedProject)
@@ -36,7 +37,7 @@ export function Sidebar({ className }: SidebarProps) {
   const projects = projectsData ?? []
 
   return (
-    <aside className={cn('border-r border-border bg-card overflow-y-auto overflow-x-hidden', className)}>
+    <aside className={cn('border-r border-border bg-card overflow-y-auto overflow-x-hidden shrink-0', className)} style={style}>
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
           <button
@@ -315,8 +316,8 @@ function VlanTreeItem({ vlan, siteId }: { vlan: VLAN; siteId: number }) {
           )}
         >
           <Network className="h-3 w-3 shrink-0" />
-          <span className="truncate">VLAN {vlan.vlan_id}</span>
-          <span className="ml-auto text-muted-foreground shrink-0 text-[10px]">{vlan.name}</span>
+          <span className="shrink-0">VLAN {vlan.vlan_id}</span>
+          <span className="truncate text-muted-foreground text-[10px]">{vlan.name}</span>
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); setAddSubnetOpen(true) }}
