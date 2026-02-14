@@ -35,9 +35,8 @@ class HostFilter(django_filters.FilterSet):
     site = django_filters.NumberFilter(field_name="subnet__vlan__site_id")
     vlan = django_filters.NumberFilter(field_name="subnet__vlan_id")
     subnet = django_filters.NumberFilter(field_name="subnet_id")
-    status = django_filters.ChoiceFilter(choices=Host.Status.choices)
     device_type = django_filters.ChoiceFilter(choices=Host.DeviceType.choices)
 
     class Meta:
         model = Host
-        fields = ["project", "site", "vlan", "subnet", "status", "device_type"]
+        fields = ["project", "site", "vlan", "subnet", "device_type"]

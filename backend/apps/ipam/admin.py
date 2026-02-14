@@ -31,8 +31,8 @@ class SubnetAdmin(admin.ModelAdmin):
 
 @admin.register(Host)
 class HostAdmin(admin.ModelAdmin):
-    list_display = ("ip_address", "hostname", "status", "device_type", "subnet")
-    list_filter = ("status", "device_type", "subnet__vlan__site__project")
+    list_display = ("ip_address", "hostname", "device_type", "subnet")
+    list_filter = ("device_type", "subnet__vlan__site__project")
     search_fields = ("hostname", "description")
 
 

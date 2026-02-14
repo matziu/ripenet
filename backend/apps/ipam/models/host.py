@@ -5,19 +5,13 @@ from .subnet import Subnet
 
 
 class Host(models.Model):
-    class Status(models.TextChoices):
-        PLANNED = "planned", "Planned"
-        ACTIVE = "active", "Active"
-        RESERVED = "reserved", "Reserved"
-        DHCP = "dhcp", "DHCP"
-        DECOMMISSIONED = "decommissioned", "Decommissioned"
-
     class DeviceType(models.TextChoices):
         SERVER = "server", "Server"
         ROUTER = "router", "Router"
         SWITCH = "switch", "Switch"
         FIREWALL = "firewall", "Firewall"
         AP = "ap", "Access Point"
+        NAS = "nas", "NAS"
         CAMERA = "camera", "Camera"
         PRINTER = "printer", "Printer"
         PHONE = "phone", "Phone"
@@ -28,7 +22,6 @@ class Host(models.Model):
     ip_address = InetAddressField(help_text="Host IP address")
     hostname = models.CharField(max_length=255, blank=True)
     mac_address = models.CharField(max_length=17, blank=True, help_text="MAC address (XX:XX:XX:XX:XX:XX)")
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLANNED)
     device_type = models.CharField(max_length=20, choices=DeviceType.choices, default=DeviceType.OTHER)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

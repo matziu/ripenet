@@ -5,7 +5,6 @@ import { useTopologyStore } from '@/stores/topology.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi, vlansApi, subnetsApi, hostsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
-import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Dialog } from '@/components/ui/Dialog'
 import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
@@ -323,13 +322,11 @@ function HostDetail({ hostId }: { hostId: number }) {
             <p className="text-xs text-muted-foreground truncate">{host.hostname}</p>
           )}
         </div>
-        <StatusBadge status={host.status} />
       </div>
 
       <dl className="space-y-1.5 text-xs">
         {host.mac_address && <DetailRow label="MAC" value={host.mac_address} mono />}
         <DetailRow label="Device Type" value={host.device_type} />
-        <DetailRow label="Status" value={host.status} />
         {host.description && <DetailRow label="Description" value={host.description} />}
       </dl>
 
@@ -398,7 +395,7 @@ function HostList({ hosts }: { hosts: Host[] }) {
               <p className="text-muted-foreground truncate mt-0.5">{host.hostname}</p>
             )}
           </div>
-          <StatusBadge status={host.status} />
+          <span className="text-[10px] text-muted-foreground">{host.device_type}</span>
         </div>
       ))}
       {hosts.length === 0 && (

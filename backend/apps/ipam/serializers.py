@@ -11,7 +11,7 @@ class HostSerializer(serializers.ModelSerializer):
         model = Host
         fields = [
             "id", "subnet", "ip_address", "hostname", "mac_address",
-            "status", "device_type", "description", "created_at", "updated_at",
+            "device_type", "description", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -88,7 +88,7 @@ class TunnelSerializer(serializers.ModelSerializer):
 class HostTopologySerializer(serializers.ModelSerializer):
     class Meta:
         model = Host
-        fields = ["id", "ip_address", "hostname", "status", "device_type"]
+        fields = ["id", "ip_address", "hostname", "device_type"]
 
 
 class SubnetTopologySerializer(serializers.ModelSerializer):

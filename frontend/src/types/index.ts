@@ -65,8 +65,7 @@ export interface Subnet {
   updated_at: string
 }
 
-export type HostStatus = 'planned' | 'active' | 'reserved' | 'dhcp' | 'decommissioned'
-export type DeviceType = 'server' | 'router' | 'switch' | 'firewall' | 'ap' | 'camera' | 'printer' | 'phone' | 'workstation' | 'other'
+export type DeviceType = 'server' | 'router' | 'switch' | 'firewall' | 'ap' | 'nas' | 'camera' | 'printer' | 'phone' | 'workstation' | 'other'
 
 export interface Host {
   id: number
@@ -74,7 +73,6 @@ export interface Host {
   ip_address: string
   hostname: string
   mac_address: string
-  status: HostStatus
   device_type: DeviceType
   description: string
   created_at: string
@@ -107,7 +105,6 @@ export interface HostTopology {
   id: number
   ip_address: string
   hostname: string
-  status: HostStatus
   device_type: DeviceType
 }
 

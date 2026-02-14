@@ -373,8 +373,8 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                                     {host.device_type}
                                     {host.mac_address && ` · ${host.mac_address}`}
                                   </td>
-                                  <td className="px-3 py-1.5">
-                                    <StatusBadge status={host.status} />
+                                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                                    {host.device_type}
                                   </td>
                                   <td className="px-3 py-1.5">
                                     <div className="flex justify-end gap-0.5">

@@ -16,7 +16,6 @@ interface FormValues {
   ip_address: string
   hostname: string
   mac_address: string
-  status: string
   device_type: string
   description: string
   subnet: string
@@ -40,12 +39,10 @@ export function HostForm({ subnetId, projectId, host, onClose }: HostFormProps) 
       ip_address: host.ip_address,
       hostname: host.hostname,
       mac_address: host.mac_address,
-      status: host.status,
       device_type: host.device_type,
       description: host.description,
       subnet: String(host.subnet),
     } : {
-      status: 'planned',
       device_type: 'other',
       subnet: subnetId ? String(subnetId) : '',
     },
@@ -75,7 +72,6 @@ export function HostForm({ subnetId, projectId, host, onClose }: HostFormProps) 
         ip_address: data.ip_address,
         hostname: data.hostname,
         mac_address: data.mac_address,
-        status: data.status,
         device_type: data.device_type,
         description: data.description,
         subnet: finalSubnetId,
@@ -143,38 +139,24 @@ export function HostForm({ subnetId, projectId, host, onClose }: HostFormProps) 
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium">Status</label>
-          <select
-            {...register('status')}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-          >
-            <option value="planned">Planned</option>
-            <option value="active">Active</option>
-            <option value="reserved">Reserved</option>
-            <option value="dhcp">DHCP</option>
-            <option value="decommissioned">Decommissioned</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-medium">Device Type</label>
-          <select
-            {...register('device_type')}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-          >
-            <option value="server">Server</option>
-            <option value="router">Router</option>
-            <option value="switch">Switch</option>
-            <option value="firewall">Firewall</option>
-            <option value="ap">Access Point</option>
-            <option value="camera">Camera</option>
-            <option value="printer">Printer</option>
-            <option value="phone">Phone</option>
-            <option value="workstation">Workstation</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
+      <div>
+        <label className="text-xs font-medium">Device Type</label>
+        <select
+          {...register('device_type')}
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+        >
+          <option value="server">Server</option>
+          <option value="router">Router</option>
+          <option value="switch">Switch</option>
+          <option value="firewall">Firewall</option>
+          <option value="ap">Access Point</option>
+          <option value="nas">NAS</option>
+          <option value="camera">Camera</option>
+          <option value="printer">Printer</option>
+          <option value="phone">Phone</option>
+          <option value="workstation">Workstation</option>
+          <option value="other">Other</option>
+        </select>
       </div>
 
       <div>

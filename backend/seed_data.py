@@ -45,21 +45,21 @@ s_voip = Subnet.objects.create(vlan=vlan_voip, network="10.0.30.0/24", gateway="
 s_guest = Subnet.objects.create(vlan=vlan_guest, network="10.0.99.0/24", gateway="10.0.99.1", description="Guest HQ")
 
 # HQ Hosts — Management
-Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.1", hostname="hq-core-sw01", status="active", device_type="switch", description="Core switch HP Aruba 5412R")
-Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.2", hostname="hq-fw01", status="active", device_type="firewall", description="FortiGate 200F")
-Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.3", hostname="hq-ap01", status="active", device_type="ap", description="Ubiquiti U6 Pro — piętro 1")
-Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.4", hostname="hq-ap02", status="active", device_type="ap", description="Ubiquiti U6 Pro — piętro 2")
-Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.5", hostname="hq-ap03", status="planned", device_type="ap", description="Ubiquiti U6 Pro — piętro 3")
+Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.1", hostname="hq-core-sw01", device_type="switch", description="Core switch HP Aruba 5412R")
+Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.2", hostname="hq-fw01", device_type="firewall", description="FortiGate 200F")
+Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.3", hostname="hq-ap01", device_type="ap", description="Ubiquiti U6 Pro — piętro 1")
+Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.4", hostname="hq-ap02", device_type="ap", description="Ubiquiti U6 Pro — piętro 2")
+Host.objects.create(subnet=s_mgmt, ip_address="10.0.10.5", hostname="hq-ap03", device_type="ap", description="Ubiquiti U6 Pro — piętro 3")
 
 # HQ Hosts — Users
-Host.objects.create(subnet=s_users, ip_address="10.0.20.10", hostname="hq-pc-kowalski", status="active", device_type="workstation")
-Host.objects.create(subnet=s_users, ip_address="10.0.20.11", hostname="hq-pc-nowak", status="active", device_type="workstation")
-Host.objects.create(subnet=s_users, ip_address="10.0.20.12", hostname="hq-printer01", status="active", device_type="printer", description="HP LaserJet Pro M428")
-Host.objects.create(subnet=s_users, ip_address="10.0.20.100", hostname="", status="dhcp", device_type="workstation", description="Pula DHCP start")
+Host.objects.create(subnet=s_users, ip_address="10.0.20.10", hostname="hq-pc-kowalski", device_type="workstation")
+Host.objects.create(subnet=s_users, ip_address="10.0.20.11", hostname="hq-pc-nowak", device_type="workstation")
+Host.objects.create(subnet=s_users, ip_address="10.0.20.12", hostname="hq-printer01", device_type="printer", description="HP LaserJet Pro M428")
+Host.objects.create(subnet=s_users, ip_address="10.0.20.100", hostname="", device_type="workstation", description="Pula DHCP start")
 
 # HQ Hosts — VoIP
-Host.objects.create(subnet=s_voip, ip_address="10.0.30.10", hostname="hq-phone-reception", status="active", device_type="phone", description="Yealink T46U")
-Host.objects.create(subnet=s_voip, ip_address="10.0.30.11", hostname="hq-phone-director", status="active", device_type="phone", description="Yealink T58W")
+Host.objects.create(subnet=s_voip, ip_address="10.0.30.10", hostname="hq-phone-reception", device_type="phone", description="Yealink T46U")
+Host.objects.create(subnet=s_voip, ip_address="10.0.30.11", hostname="hq-phone-director", device_type="phone", description="Yealink T58W")
 
 # --- DC VLANs ---
 vlan_dc_mgmt = VLAN.objects.create(site=dc, vlan_id=10, name="Management", purpose="Zarządzanie urządzeniami DC")
@@ -74,21 +74,21 @@ s_storage = Subnet.objects.create(vlan=vlan_storage, network="10.1.110.0/24", ga
 s_dmz = Subnet.objects.create(vlan=vlan_dmz, network="10.1.200.0/24", gateway="10.1.200.1", description="DMZ")
 
 # DC Hosts — Management
-Host.objects.create(subnet=s_dc_mgmt, ip_address="10.1.10.1", hostname="dc-core-sw01", status="active", device_type="switch", description="Cisco Nexus 9336C")
-Host.objects.create(subnet=s_dc_mgmt, ip_address="10.1.10.2", hostname="dc-fw01", status="active", device_type="firewall", description="Palo Alto PA-820")
-Host.objects.create(subnet=s_dc_mgmt, ip_address="10.1.10.3", hostname="dc-router01", status="active", device_type="router", description="Cisco ISR 4331")
+Host.objects.create(subnet=s_dc_mgmt, ip_address="10.1.10.1", hostname="dc-core-sw01", device_type="switch", description="Cisco Nexus 9336C")
+Host.objects.create(subnet=s_dc_mgmt, ip_address="10.1.10.2", hostname="dc-fw01", device_type="firewall", description="Palo Alto PA-820")
+Host.objects.create(subnet=s_dc_mgmt, ip_address="10.1.10.3", hostname="dc-router01", device_type="router", description="Cisco ISR 4331")
 
 # DC Hosts — Servers
-Host.objects.create(subnet=s_servers, ip_address="10.1.100.10", hostname="dc-web01", status="active", device_type="server", description="Nginx reverse proxy")
-Host.objects.create(subnet=s_servers, ip_address="10.1.100.11", hostname="dc-app01", status="active", device_type="server", description="Django app server")
-Host.objects.create(subnet=s_servers, ip_address="10.1.100.12", hostname="dc-db01", status="active", device_type="server", description="PostgreSQL primary")
-Host.objects.create(subnet=s_servers, ip_address="10.1.100.13", hostname="dc-db02", status="active", device_type="server", description="PostgreSQL replica")
-Host.objects.create(subnet=s_servers, ip_address="10.1.100.20", hostname="dc-monitor01", status="active", device_type="server", description="Zabbix + Grafana")
-Host.objects.create(subnet=s_servers, ip_address="10.1.100.21", hostname="dc-log01", status="active", device_type="server", description="ELK stack")
+Host.objects.create(subnet=s_servers, ip_address="10.1.100.10", hostname="dc-web01", device_type="server", description="Nginx reverse proxy")
+Host.objects.create(subnet=s_servers, ip_address="10.1.100.11", hostname="dc-app01", device_type="server", description="Django app server")
+Host.objects.create(subnet=s_servers, ip_address="10.1.100.12", hostname="dc-db01", device_type="server", description="PostgreSQL primary")
+Host.objects.create(subnet=s_servers, ip_address="10.1.100.13", hostname="dc-db02", device_type="server", description="PostgreSQL replica")
+Host.objects.create(subnet=s_servers, ip_address="10.1.100.20", hostname="dc-monitor01", device_type="server", description="Zabbix + Grafana")
+Host.objects.create(subnet=s_servers, ip_address="10.1.100.21", hostname="dc-log01", device_type="server", description="ELK stack")
 
 # DC Hosts — DMZ
-Host.objects.create(subnet=s_dmz, ip_address="10.1.200.10", hostname="dc-mail01", status="active", device_type="server", description="Mail gateway")
-Host.objects.create(subnet=s_dmz, ip_address="10.1.200.11", hostname="dc-vpn01", status="active", device_type="server", description="OpenVPN server")
+Host.objects.create(subnet=s_dmz, ip_address="10.1.200.10", hostname="dc-mail01", device_type="server", description="Mail gateway")
+Host.objects.create(subnet=s_dmz, ip_address="10.1.200.11", hostname="dc-vpn01", device_type="server", description="OpenVPN server")
 
 # --- Branch Nowa Huta VLANs ---
 vlan_br_mgmt = VLAN.objects.create(site=br, vlan_id=10, name="Management", purpose="Zarządzanie")
@@ -101,14 +101,14 @@ s_br_users = Subnet.objects.create(vlan=vlan_br_users, network="10.2.20.0/24", g
 s_br_cam = Subnet.objects.create(vlan=vlan_br_cam, network="10.2.50.0/24", gateway="10.2.50.1", description="CCTV Branch")
 
 # Branch Hosts
-Host.objects.create(subnet=s_br_mgmt, ip_address="10.2.10.1", hostname="br-sw01", status="active", device_type="switch", description="HP Aruba 2930F")
-Host.objects.create(subnet=s_br_mgmt, ip_address="10.2.10.2", hostname="br-router01", status="active", device_type="router", description="MikroTik RB4011")
-Host.objects.create(subnet=s_br_users, ip_address="10.2.20.10", hostname="br-pc-jankowski", status="active", device_type="workstation")
-Host.objects.create(subnet=s_br_users, ip_address="10.2.20.11", hostname="br-pc-wisniewski", status="active", device_type="workstation")
-Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.10", hostname="br-cam01", status="active", device_type="camera", description="Hikvision DS-2CD2143 — wejście")
-Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.11", hostname="br-cam02", status="active", device_type="camera", description="Hikvision DS-2CD2143 — parking")
-Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.12", hostname="br-cam03", status="planned", device_type="camera", description="Hikvision DS-2CD2143 — magazyn")
-Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.100", hostname="br-nvr01", status="active", device_type="server", description="NVR Hikvision DS-7616")
+Host.objects.create(subnet=s_br_mgmt, ip_address="10.2.10.1", hostname="br-sw01", device_type="switch", description="HP Aruba 2930F")
+Host.objects.create(subnet=s_br_mgmt, ip_address="10.2.10.2", hostname="br-router01", device_type="router", description="MikroTik RB4011")
+Host.objects.create(subnet=s_br_users, ip_address="10.2.20.10", hostname="br-pc-jankowski", device_type="workstation")
+Host.objects.create(subnet=s_br_users, ip_address="10.2.20.11", hostname="br-pc-wisniewski", device_type="workstation")
+Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.10", hostname="br-cam01", device_type="camera", description="Hikvision DS-2CD2143 — wejście")
+Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.11", hostname="br-cam02", device_type="camera", description="Hikvision DS-2CD2143 — parking")
+Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.12", hostname="br-cam03", device_type="camera", description="Hikvision DS-2CD2143 — magazyn")
+Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.100", hostname="br-nvr01", device_type="server", description="NVR Hikvision DS-7616")
 
 # === Tunnels ===
 Tunnel.objects.create(
@@ -152,9 +152,9 @@ s_waw_srv = Subnet.objects.create(vlan=vlan_waw_srv, network="10.10.100.0/24", g
 s_waw_usr = Subnet.objects.create(vlan=vlan_waw_usr, network="10.10.20.0/24", gateway="10.10.20.1")
 s_co_usr = Subnet.objects.create(vlan=vlan_co_usr, network="10.10.120.0/24", gateway="10.10.120.1")
 
-Host.objects.create(subnet=s_waw_srv, ip_address="10.10.100.10", hostname="waw-srv01", status="planned", device_type="server", description="Planowany serwer plików")
-Host.objects.create(subnet=s_waw_usr, ip_address="10.10.20.10", hostname="waw-pc01", status="planned", device_type="workstation")
-Host.objects.create(subnet=s_co_usr, ip_address="10.10.120.10", hostname="co-pc01", status="planned", device_type="workstation")
+Host.objects.create(subnet=s_waw_srv, ip_address="10.10.100.10", hostname="waw-srv01", device_type="server", description="Planowany serwer plików")
+Host.objects.create(subnet=s_waw_usr, ip_address="10.10.20.10", hostname="waw-pc01", device_type="workstation")
+Host.objects.create(subnet=s_co_usr, ip_address="10.10.120.10", hostname="co-pc01", device_type="workstation")
 
 Tunnel.objects.create(
     project=p2, name="Centrum-Mokotów VPN", tunnel_type="wireguard",
