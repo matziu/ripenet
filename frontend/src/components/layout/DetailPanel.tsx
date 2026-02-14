@@ -5,6 +5,7 @@ import { useTopologyStore } from '@/stores/topology.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi, vlansApi, subnetsApi, hostsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
+import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { Dialog } from '@/components/ui/Dialog'
 import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
@@ -249,9 +250,10 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
         <span className="text-sm font-semibold font-mono">{subnet.network}</span>
       </div>
 
+      <SubnetUtilBar network={subnet.network} hostCount={subnet.host_count} variant="full" />
+
       <dl className="space-y-1.5 text-xs">
         {subnet.gateway && <DetailRow label="Gateway" value={subnet.gateway} mono />}
-        <DetailRow label="Hosts" value={String(subnet.host_count)} />
         {subnet.description && <DetailRow label="Description" value={subnet.description} />}
       </dl>
 

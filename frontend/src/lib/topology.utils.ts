@@ -52,12 +52,18 @@ export function getVlanColor(purpose: string, index: number) {
   return VLAN_PURPOSE_COLORS[key] ?? VLAN_INDEX_COLORS[index % VLAN_INDEX_COLORS.length]
 }
 
+export interface SubnetBrief {
+  network: string
+  hostCount: number
+}
+
 export interface VlanEmbedded {
   id: number
   vlanId: number
   name: string
   purpose: string
   subnets: string[]
+  subnetDetails: SubnetBrief[]
   hostCount: number
   colorIndex: number
 }
@@ -108,6 +114,7 @@ function vlansToEmbedded(vlans: VLANTopology[]): VlanEmbedded[] {
     name: vlan.name,
     purpose: vlan.purpose,
     subnets: vlan.subnets.map((s) => s.network),
+    subnetDetails: vlan.subnets.map((s) => ({ network: s.network, hostCount: s.hosts.length })),
     hostCount: vlan.subnets.reduce((sum, s) => sum + s.hosts.length, 0),
     colorIndex: i,
   }))

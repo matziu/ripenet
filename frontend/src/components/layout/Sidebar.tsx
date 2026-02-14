@@ -11,6 +11,7 @@ import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
 import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
+import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { ProjectForm } from '@/components/data/forms/ProjectForm'
 import { toast } from 'sonner'
 import type { Project, Site, VLAN, Subnet, Host } from '@/types'
@@ -449,9 +450,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
         >
           <Server className="h-3 w-3 shrink-0" />
           <span className="truncate font-mono text-[11px]">{subnet.network}</span>
-          <span className="ml-auto text-muted-foreground shrink-0 text-[10px] bg-muted rounded px-1">
-            {subnet.host_count}h
-          </span>
+          <SubnetUtilBar network={subnet.network} hostCount={subnet.host_count} className="ml-auto shrink-0" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); setAddHostOpen(true) }}

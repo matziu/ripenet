@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { Dialog } from '@/components/ui/Dialog'
 import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
@@ -332,9 +333,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                                     {subOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                                     <Network className="h-3.5 w-3.5 text-emerald-500" />
                                     <span className="font-mono">{subnetNode.subnet.network}</span>
-                                    <span className="text-xs font-normal text-muted-foreground ml-1">
-                                      ({subnetNode.hosts.length} hosts)
-                                    </span>
+                                    <SubnetUtilBar network={subnetNode.subnet.network} hostCount={subnetNode.hosts.length} className="ml-2" />
                                   </button>
                                 </td>
                                 <td className="px-3 py-1.5 text-muted-foreground text-xs">

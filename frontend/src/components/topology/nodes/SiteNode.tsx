@@ -7,6 +7,7 @@ import { useTopologyStore } from '@/stores/topology.store'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
 import { Building2, ChevronDown, ChevronRight, Globe, Network } from 'lucide-react'
+import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { cn } from '@/lib/utils'
 
 function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
@@ -47,14 +48,12 @@ function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
           <span className="text-[10px] text-muted-foreground ml-1.5">{vlan.name}</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {vlan.subnets.length > 0 && (
-            <span className="text-[9px] font-mono text-muted-foreground">
-              {vlan.subnets[0]}
-            </span>
+          {vlan.subnetDetails.length > 0 && (
+            <SubnetUtilBar
+              network={vlan.subnetDetails[0].network}
+              hostCount={vlan.subnetDetails[0].hostCount}
+            />
           )}
-          <span className="text-[9px] text-muted-foreground bg-background/60 rounded px-1 py-0.5">
-            {vlan.hostCount}h
-          </span>
         </div>
       </div>
     </div>
