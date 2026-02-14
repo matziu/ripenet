@@ -18,7 +18,7 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  sidebarOpen: true,
+  sidebarOpen: window.innerWidth >= 768,
   sidebarWidth: parseInt(localStorage.getItem('sidebarWidth') ?? '256', 10),
   detailPanelOpen: false,
   viewMode: 'topology',

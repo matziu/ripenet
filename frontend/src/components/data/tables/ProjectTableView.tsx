@@ -71,7 +71,7 @@ export function ProjectTableView({ projectId, activeTab }: ProjectTableViewProps
         ))}
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-2 md:p-4">
         {activeTab === 'network' && <NetworkHierarchy projectId={projectId} />}
         {activeTab === 'tunnels' && <TunnelsTable projectId={projectId} />}
       </div>
@@ -202,37 +202,37 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
   return (
     <>
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <h3 className="text-sm font-medium text-muted-foreground">
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <h3 className="text-xs md:text-sm font-medium text-muted-foreground truncate">
             {sites?.length ?? 0} sites, {vlans?.length ?? 0} VLANs, {subnets?.length ?? 0} subnets, {totalHosts} hosts
           </h3>
-          <div className="flex gap-1 text-[10px]">
+          <div className="flex gap-1 text-[10px] shrink-0">
             <button onClick={expandAll} className="rounded border border-border px-1.5 py-0.5 hover:bg-accent text-muted-foreground">
-              Expand all
+              Expand
             </button>
             <button onClick={collapseAll} className="rounded border border-border px-1.5 py-0.5 hover:bg-accent text-muted-foreground">
-              Collapse all
+              Collapse
             </button>
           </div>
         </div>
         <button
           onClick={() => setDialog({ type: 'site', mode: 'add' })}
-          className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+          className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 shrink-0"
         >
-          <Plus className="h-3.5 w-3.5" /> Add Site
+          <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add</span> Site
         </button>
       </div>
 
       {/* Tree table */}
-      <div className="rounded-md border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-md border border-border overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="border-b border-border bg-muted/50 text-left">
-              <th className="px-3 py-2 font-medium">Name / Identifier</th>
-              <th className="px-3 py-2 font-medium">Details</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium w-24 text-right">Actions</th>
+              <th className="px-2 md:px-3 py-2 font-medium">Name / Identifier</th>
+              <th className="px-2 md:px-3 py-2 font-medium hidden sm:table-cell">Details</th>
+              <th className="px-2 md:px-3 py-2 font-medium hidden md:table-cell">Status</th>
+              <th className="px-2 md:px-3 py-2 font-medium w-20 md:w-24 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -244,7 +244,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                 <TreeFragment key={siteKey}>
                   {/* Site row */}
                   <tr className="border-b border-border hover:bg-accent/20 bg-muted/30">
-                    <td className="px-3 py-2">
+                    <td className="px-2 md:px-3 py-2">
                       <button onClick={() => toggle(siteKey)} className="flex items-center gap-1.5 font-medium">
                         {siteOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                         <Building2 className="h-3.5 w-3.5 text-blue-500" />
@@ -254,7 +254,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                         </span>
                       </button>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground text-xs">
+                    <td className="px-2 md:px-3 py-2 text-muted-foreground text-xs hidden sm:table-cell">
                       {siteNode.site.address || '-'}
                       {siteNode.site.wan_addresses?.length > 0 && (
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
@@ -268,8 +268,8 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2"></td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 md:px-3 py-2 hidden md:table-cell"></td>
+                    <td className="px-2 md:px-3 py-2">
                       <div className="flex justify-end gap-0.5">
                         <button onClick={() => setDialog({ type: 'vlan', mode: 'add', parentId: siteNode.site.id })} className="p-1 rounded hover:bg-accent" title="Add VLAN">
                           <Plus className="h-3.5 w-3.5 text-muted-foreground" />
@@ -292,20 +292,20 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                     return (
                       <TreeFragment key={vlanKey}>
                         <tr className="border-b border-border hover:bg-accent/20">
-                          <td className="px-3 py-1.5 pl-8">
+                          <td className="px-2 md:px-3 py-1.5 pl-6 md:pl-8">
                             <button onClick={() => toggle(vlanKey)} className="flex items-center gap-1.5 font-medium text-sm">
                               {vlanOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                               <Network className="h-3.5 w-3.5 text-violet-500" />
                               <span className="font-mono text-xs">VLAN {vlanNode.vlan.vlan_id}</span>
-                              <span className="font-normal">&mdash; {vlanNode.vlan.name}</span>
+                              <span className="font-normal hidden sm:inline">&mdash; {vlanNode.vlan.name}</span>
                               <span className="text-xs font-normal text-muted-foreground ml-1">
-                                ({vlanNode.subnets.length} subnets)
+                                ({vlanNode.subnets.length})
                               </span>
                             </button>
                           </td>
-                          <td className="px-3 py-1.5 text-muted-foreground text-xs">{vlanNode.vlan.purpose || '-'}</td>
-                          <td className="px-3 py-1.5"></td>
-                          <td className="px-3 py-1.5">
+                          <td className="px-2 md:px-3 py-1.5 text-muted-foreground text-xs hidden sm:table-cell">{vlanNode.vlan.purpose || '-'}</td>
+                          <td className="px-2 md:px-3 py-1.5 hidden md:table-cell"></td>
+                          <td className="px-2 md:px-3 py-1.5">
                             <div className="flex justify-end gap-0.5">
                               <button onClick={() => setDialog({ type: 'subnet', mode: 'add', parentId: vlanNode.vlan.id })} className="p-1 rounded hover:bg-accent" title="Add subnet">
                                 <Plus className="h-3.5 w-3.5 text-muted-foreground" />
@@ -328,20 +328,20 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                           return (
                             <TreeFragment key={subKey}>
                               <tr className="border-b border-border hover:bg-accent/20">
-                                <td className="px-3 py-1.5 pl-14">
+                                <td className="px-2 md:px-3 py-1.5 pl-10 md:pl-14">
                                   <button onClick={() => toggle(subKey)} className="flex items-center gap-1.5 text-sm">
                                     {subOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                                     <Network className="h-3.5 w-3.5 text-emerald-500" />
-                                    <span className="font-mono">{subnetNode.subnet.network}</span>
+                                    <span className="font-mono text-xs">{subnetNode.subnet.network}</span>
                                     <SubnetUtilBar network={subnetNode.subnet.network} hostCount={subnetNode.hosts.length} className="ml-2" />
                                   </button>
                                 </td>
-                                <td className="px-3 py-1.5 text-muted-foreground text-xs">
+                                <td className="px-2 md:px-3 py-1.5 text-muted-foreground text-xs hidden sm:table-cell">
                                   {subnetNode.subnet.gateway ? `gw ${subnetNode.subnet.gateway}` : '-'}
                                   {subnetNode.subnet.description && ` · ${subnetNode.subnet.description}`}
                                 </td>
-                                <td className="px-3 py-1.5"></td>
-                                <td className="px-3 py-1.5">
+                                <td className="px-2 md:px-3 py-1.5 hidden md:table-cell"></td>
+                                <td className="px-2 md:px-3 py-1.5">
                                   <div className="flex justify-end gap-0.5">
                                     <button onClick={() => setDialog({ type: 'host', mode: 'add', parentId: subnetNode.subnet.id })} className="p-1 rounded hover:bg-accent" title="Add host">
                                       <Plus className="h-3.5 w-3.5 text-muted-foreground" />
@@ -359,23 +359,23 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                               {/* Host rows */}
                               {subOpen && subnetNode.hosts.map((host) => (
                                 <tr key={host.id} className="border-b border-border hover:bg-accent/20">
-                                  <td className="px-3 py-1.5 pl-20">
+                                  <td className="px-2 md:px-3 py-1.5 pl-14 md:pl-20">
                                     <span className="flex items-center gap-1.5 text-sm">
                                       <Server className="h-3 w-3 text-orange-500" />
                                       <CopyableIP ip={host.ip_address} />
                                       {host.hostname && (
-                                        <span className="text-muted-foreground">({host.hostname})</span>
+                                        <span className="text-muted-foreground hidden sm:inline">({host.hostname})</span>
                                       )}
                                     </span>
                                   </td>
-                                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                                  <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
                                     {host.device_type}
                                     {host.mac_address && ` · ${host.mac_address}`}
                                   </td>
-                                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                                  <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden md:table-cell">
                                     {host.device_type}
                                   </td>
-                                  <td className="px-3 py-1.5">
+                                  <td className="px-2 md:px-3 py-1.5">
                                     <div className="flex justify-end gap-0.5">
                                       <button onClick={() => setDialog({ type: 'host', mode: 'edit', entity: host })} className="p-1 rounded hover:bg-accent" title="Edit host">
                                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -510,33 +510,33 @@ function TunnelsTable({ projectId }: { projectId: number }) {
           <Plus className="h-3.5 w-3.5" /> Add Tunnel
         </button>
       </div>
-      <div className="rounded-md border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-md border border-border overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="border-b border-border bg-muted/50 text-left">
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium">Subnet</th>
-              <th className="px-3 py-2 font-medium">Site A</th>
-              <th className="px-3 py-2 font-medium">IP A</th>
-              <th className="px-3 py-2 font-medium">Site B</th>
-              <th className="px-3 py-2 font-medium">IP B</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium w-20"></th>
+              <th className="px-2 md:px-3 py-2 font-medium">Name</th>
+              <th className="px-2 md:px-3 py-2 font-medium hidden sm:table-cell">Type</th>
+              <th className="px-2 md:px-3 py-2 font-medium hidden md:table-cell">Subnet</th>
+              <th className="px-2 md:px-3 py-2 font-medium">Site A</th>
+              <th className="px-2 md:px-3 py-2 font-medium">IP A</th>
+              <th className="px-2 md:px-3 py-2 font-medium">Site B</th>
+              <th className="px-2 md:px-3 py-2 font-medium">IP B</th>
+              <th className="px-2 md:px-3 py-2 font-medium hidden sm:table-cell">Status</th>
+              <th className="px-2 md:px-3 py-2 font-medium w-16 md:w-20"></th>
             </tr>
           </thead>
           <tbody>
             {tunnels?.map((tunnel) => (
               <tr key={tunnel.id} className="border-b border-border hover:bg-accent/30">
-                <td className="px-3 py-2 font-medium">{tunnel.name}</td>
-                <td className="px-3 py-2 uppercase text-xs">{tunnel.tunnel_type}</td>
-                <td className="px-3 py-2 font-mono text-xs">{tunnel.tunnel_subnet}</td>
-                <td className="px-3 py-2">{tunnel.site_a_name}</td>
-                <td className="px-3 py-2"><CopyableIP ip={tunnel.ip_a} /></td>
-                <td className="px-3 py-2">{tunnel.site_b_name}</td>
-                <td className="px-3 py-2"><CopyableIP ip={tunnel.ip_b} /></td>
-                <td className="px-3 py-2"><StatusBadge status={tunnel.status} /></td>
-                <td className="px-3 py-2">
+                <td className="px-2 md:px-3 py-2 font-medium">{tunnel.name}</td>
+                <td className="px-2 md:px-3 py-2 uppercase text-xs hidden sm:table-cell">{tunnel.tunnel_type}</td>
+                <td className="px-2 md:px-3 py-2 font-mono text-xs hidden md:table-cell">{tunnel.tunnel_subnet}</td>
+                <td className="px-2 md:px-3 py-2">{tunnel.site_a_name}</td>
+                <td className="px-2 md:px-3 py-2"><CopyableIP ip={tunnel.ip_a} /></td>
+                <td className="px-2 md:px-3 py-2">{tunnel.site_b_name}</td>
+                <td className="px-2 md:px-3 py-2"><CopyableIP ip={tunnel.ip_b} /></td>
+                <td className="px-2 md:px-3 py-2 hidden sm:table-cell"><StatusBadge status={tunnel.status} /></td>
+                <td className="px-2 md:px-3 py-2">
                   <div className="flex gap-1">
                     <button onClick={() => openEdit(tunnel)} className="p-1 rounded hover:bg-accent" title="Edit">
                       <Pencil className="h-3.5 w-3.5 text-muted-foreground" />

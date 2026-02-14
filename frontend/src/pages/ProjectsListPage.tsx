@@ -51,20 +51,20 @@ export function ProjectsListPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Projects</h1>
+    <div className="p-3 md:p-6">
+      <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
+        <h1 className="text-xl md:text-2xl font-bold">Projects</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/wizard')}
-            className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
+            className="flex items-center gap-2 rounded-md border border-border px-3 md:px-4 py-2 text-sm font-medium hover:bg-accent"
           >
             <Wand2 className="h-4 w-4" />
-            Design Wizard
+            <span className="hidden sm:inline">Design Wizard</span>
           </button>
           <button
             onClick={() => setShowCreate(!showCreate)}
-            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="flex items-center gap-2 rounded-md bg-primary px-3 md:px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
             New Project
@@ -122,16 +122,16 @@ export function ProjectsListPage() {
         </form>
       )}
 
-      <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-lg border border-border overflow-x-auto">
+        <table className="w-full text-sm min-w-[500px]">
           <thead>
             <tr className="border-b border-border bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium">Name</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Supernet</th>
-              <th className="px-4 py-3 text-left font-medium">Sites</th>
-              <th className="px-4 py-3 text-left font-medium">Created</th>
-              <th className="px-4 py-3 text-right font-medium">Actions</th>
+              <th className="px-3 md:px-4 py-3 text-left font-medium">Name</th>
+              <th className="px-3 md:px-4 py-3 text-left font-medium">Status</th>
+              <th className="px-3 md:px-4 py-3 text-left font-medium hidden sm:table-cell">Supernet</th>
+              <th className="px-3 md:px-4 py-3 text-left font-medium">Sites</th>
+              <th className="px-3 md:px-4 py-3 text-left font-medium hidden md:table-cell">Created</th>
+              <th className="px-3 md:px-4 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -141,16 +141,16 @@ export function ProjectsListPage() {
                 className="border-b border-border hover:bg-accent/30 cursor-pointer"
                 onClick={() => navigate(`/projects/${project.id}`)}
               >
-                <td className="px-4 py-3 font-medium">{project.name}</td>
-                <td className="px-4 py-3">
+                <td className="px-3 md:px-4 py-3 font-medium">{project.name}</td>
+                <td className="px-3 md:px-4 py-3">
                   <StatusBadge status={project.status} />
                 </td>
-                <td className="px-4 py-3 font-mono text-xs">{project.supernet ?? '-'}</td>
-                <td className="px-4 py-3">{project.site_count}</td>
-                <td className="px-4 py-3 text-muted-foreground">
+                <td className="px-3 md:px-4 py-3 font-mono text-xs hidden sm:table-cell">{project.supernet ?? '-'}</td>
+                <td className="px-3 md:px-4 py-3">{project.site_count}</td>
+                <td className="px-3 md:px-4 py-3 text-muted-foreground hidden md:table-cell">
                   {new Date(project.created_at).toLocaleDateString()}
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-3 md:px-4 py-3 text-right">
                   <div className="flex justify-end gap-1">
                     <button
                       onClick={(e) => {

@@ -26,11 +26,20 @@ interface SidebarProps {
   style?: React.CSSProperties
 }
 
+function useCloseSidebarOnMobile() {
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar)
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen)
+  return () => {
+    if (sidebarOpen && window.innerWidth < 768) toggleSidebar()
+  }
+}
+
 export function Sidebar({ className, style }: SidebarProps) {
   const navigate = useNavigate()
   const { projectId } = useParams()
   const location = useLocation()
   const setSelectedProject = useSelectionStore((s) => s.setSelectedProject)
+  const closeMobile = useCloseSidebarOnMobile()
 
   // Derive view suffix from current URL to preserve it when switching projects
   const viewSuffix = projectId
@@ -74,6 +83,7 @@ export function Sidebar({ className, style }: SidebarProps) {
                 setSelectedProject(project.id)
                 const suffix = viewSuffix ? `/${viewSuffix}` : ''
                 navigate(`/projects/${project.id}${suffix}`)
+                closeMobile()
               }}
             />
           ))}
@@ -202,6 +212,7 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
   const setSelectedSite = useSelectionStore((s) => s.setSelectedSite)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const closeMobile = useCloseSidebarOnMobile()
   const isSelected = selectedSiteId === site.id
 
   const [addVlanOpen, setAddVlanOpen] = useState(false)
@@ -228,6 +239,7 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
   const handleClick = () => {
     setSelectedSite(site.id)
     if (!detailPanelOpen) toggleDetailPanel()
+    closeMobile()
   }
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -258,7 +270,7 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); setAddVlanOpen(true) }}
-          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           title="Add VLAN"
         >
           <Plus className="h-3 w-3" />
@@ -300,6 +312,7 @@ function VlanTreeItem({ vlan, siteId }: { vlan: VLAN; siteId: number }) {
   const setSelectedVlan = useSelectionStore((s) => s.setSelectedVlan)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const closeMobile = useCloseSidebarOnMobile()
   const isSelected = selectedVlanId === vlan.id
 
   const [addSubnetOpen, setAddSubnetOpen] = useState(false)
@@ -326,6 +339,7 @@ function VlanTreeItem({ vlan, siteId }: { vlan: VLAN; siteId: number }) {
   const handleClick = () => {
     setSelectedVlan(vlan.id)
     if (!detailPanelOpen) toggleDetailPanel()
+    closeMobile()
   }
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -356,7 +370,7 @@ function VlanTreeItem({ vlan, siteId }: { vlan: VLAN; siteId: number }) {
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); setAddSubnetOpen(true) }}
-          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           title="Add subnet"
         >
           <Plus className="h-3 w-3" />
@@ -398,6 +412,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
   const setSelectedSubnet = useSelectionStore((s) => s.setSelectedSubnet)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const closeMobile = useCloseSidebarOnMobile()
   const isSelected = selectedSubnetId === subnet.id
 
   const [editOpen, setEditOpen] = useState(false)
@@ -424,6 +439,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
   const handleClick = () => {
     setSelectedSubnet(subnet.id)
     if (!detailPanelOpen) toggleDetailPanel()
+    closeMobile()
   }
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -454,7 +470,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); setAddHostOpen(true) }}
-          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           title="Add host"
         >
           <Plus className="h-3 w-3" />
@@ -494,6 +510,7 @@ function HostTreeItem({ host, subnetId }: { host: Host; subnetId: number }) {
   const setSelectedHost = useSelectionStore((s) => s.setSelectedHost)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const closeMobile = useCloseSidebarOnMobile()
   const isSelected = selectedHostId === host.id
 
   const [editOpen, setEditOpen] = useState(false)
@@ -511,6 +528,7 @@ function HostTreeItem({ host, subnetId }: { host: Host; subnetId: number }) {
   const handleClick = () => {
     setSelectedHost(host.id)
     if (!detailPanelOpen) toggleDetailPanel()
+    closeMobile()
   }
 
   return (

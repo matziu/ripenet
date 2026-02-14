@@ -9,7 +9,9 @@ export function AppShell() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
   const sidebarWidth = useUIStore((s) => s.sidebarWidth)
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
   const dragging = useRef(false)
 
   const onMouseDown = useCallback(
@@ -43,20 +45,43 @@ export function AppShell() {
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <TopBar />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile sidebar overlay backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/40 md:hidden"
+            onClick={toggleSidebar}
+          />
+        )}
+
+        {/* Sidebar: overlay on mobile, inline on desktop */}
         {sidebarOpen && (
           <>
-            <Sidebar style={{ width: sidebarWidth }} />
+            <Sidebar
+              style={{ width: sidebarWidth }}
+              className="max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:top-12 max-md:shadow-xl max-md:w-72!"
+            />
             <div
               onMouseDown={onMouseDown}
-              className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors"
+              className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors hidden md:block"
             />
           </>
         )}
+
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
-        {detailPanelOpen && <DetailPanel />}
+
+        {/* Detail panel: overlay on mobile, inline on desktop */}
+        {detailPanelOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-30 bg-black/40 md:hidden"
+              onClick={toggleDetailPanel}
+            />
+            <DetailPanel className="max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-40 max-md:top-12 max-md:w-80 max-md:shadow-xl" />
+          </>
+        )}
       </div>
     </div>
   )

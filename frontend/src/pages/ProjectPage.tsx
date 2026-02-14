@@ -74,13 +74,13 @@ export function ProjectPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Project header */}
-      <div className="flex items-center gap-3 border-b border-border px-4 py-2 bg-card/50">
-        <h2 className="text-sm font-semibold">{project.name}</h2>
+      <div className="flex items-center gap-2 md:gap-3 border-b border-border px-3 md:px-4 py-2 bg-card/50">
+        <h2 className="text-sm font-semibold truncate">{project.name}</h2>
         <StatusBadge status={project.status} />
         {project.supernet && (
-          <span className="text-xs font-mono text-muted-foreground">{project.supernet}</span>
+          <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{project.supernet}</span>
         )}
-        <div className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
+        <div className="ml-auto items-center gap-1 text-[10px] text-muted-foreground hidden md:flex">
           <kbd className="rounded border border-border px-1">1</kbd> Topo
           <kbd className="rounded border border-border px-1 ml-2">2</kbd> Geo
           <kbd className="rounded border border-border px-1 ml-2">3</kbd> Table

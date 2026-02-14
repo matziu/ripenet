@@ -5,6 +5,7 @@ import { useTopologyStore } from '@/stores/topology.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi, vlansApi, subnetsApi, hostsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
+import { cn } from '@/lib/utils'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { Dialog } from '@/components/ui/Dialog'
 import { SiteForm } from '@/components/data/forms/SiteForm'
@@ -18,7 +19,7 @@ import {
   MapPin, Network, Server, Monitor,
 } from 'lucide-react'
 
-export function DetailPanel() {
+export function DetailPanel({ className }: { className?: string }) {
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
 
   // Selection from sidebar
@@ -45,7 +46,7 @@ export function DetailPanel() {
   const effectiveVlanId = selectedVlanId || topoVlanId
 
   return (
-    <aside className="w-80 border-l border-border bg-card overflow-y-auto">
+    <aside className={cn("w-80 border-l border-border bg-card overflow-y-auto", className)}>
       <div className="flex items-center justify-between p-3 border-b border-border">
         <h3 className="text-sm font-semibold">Details</h3>
         <button onClick={toggleDetailPanel} className="p-1 rounded hover:bg-accent">
