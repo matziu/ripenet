@@ -11,6 +11,12 @@ const tunnelTypeColors: Record<string, string> = {
   vxlan: '#06b6d4',
 }
 
+const statusStyles: Record<string, { dasharray?: string; opacity: number; animate: boolean }> = {
+  active: { opacity: 1, animate: true },
+  planned: { dasharray: '8 4', opacity: 0.5, animate: false },
+  down: { dasharray: '4 4', opacity: 0.4, animate: false },
+}
+
 const PERPENDICULAR_OFFSET = 18
 
 /** Get a point at a fraction along an SVG path, plus a perpendicular offset. */
@@ -51,13 +57,13 @@ export function TunnelEdge({ sourceX, sourceY, targetX, targetY, sourcePosition,
   })
 
   const color = tunnelTypeColors[d.tunnelType] ?? '#94a3b8'
+  const status = statusStyles[d.status] ?? statusStyles.active
 
   // offsetSide from layout: +1 or -1, pushes labels away from graph centroid
   const side = (d.offsetSide as number) ?? 1
   const offset = side * PERPENDICULAR_OFFSET
 
   // Compute IP label positions on the actual Bezier curve.
-  // Both labels on the SAME side (outward from centroid), at 12%/88% of the curve.
   const { ipAPos, ipBPos } = useMemo(() => {
     if (!edgePath) return { ipAPos: null, ipBPos: null }
     try {
@@ -66,7 +72,6 @@ export function TunnelEdge({ sourceX, sourceY, targetX, targetY, sourcePosition,
         ipBPos: getPointOnPath(edgePath, 0.88, offset),
       }
     } catch {
-      // Fallback to linear interpolation with perpendicular offset
       const dx = targetX - sourceX
       const dy = targetY - sourceY
       const len = Math.sqrt(dx * dx + dy * dy) || 1
@@ -87,32 +92,67 @@ export function TunnelEdge({ sourceX, sourceY, targetX, targetY, sourcePosition,
 
   return (
     <>
+      {/* Glow layer for active tunnels */}
+      {status.animate && (
+        <BaseEdge
+          id={`${id}-glow`}
+          path={edgePath}
+          style={{
+            stroke: color,
+            strokeWidth: 6,
+            opacity: 0.15,
+            filter: 'blur(3px)',
+          }}
+        />
+      )}
       <BaseEdge
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
         markerStart={markerStart}
-        style={{ stroke: color, strokeWidth: 2 }}
+        style={{
+          stroke: color,
+          strokeWidth: 2,
+          strokeDasharray: status.dasharray,
+          opacity: status.opacity,
+        }}
       />
+      {/* Animated flow overlay for active tunnels */}
+      {status.animate && (
+        <BaseEdge
+          id={`${id}-flow`}
+          path={edgePath}
+          style={{
+            stroke: color,
+            strokeWidth: 2,
+            strokeDasharray: '4 8',
+            opacity: 0.6,
+            animation: 'dash-flow 1.5s linear infinite',
+          }}
+        />
+      )}
       <EdgeLabelRenderer>
         {/* Center label: subnet + type */}
         <div
-          className="absolute rounded border bg-card px-1.5 py-0.5 text-[10px] font-mono shadow-sm pointer-events-all"
+          className="absolute rounded-md border bg-card/95 backdrop-blur-sm px-2 py-0.5 text-[10px] font-mono shadow-sm pointer-events-all"
           style={{
             borderColor: color,
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
           }}
         >
           <span>{d.label}</span>
-          <span className="ml-1 text-muted-foreground uppercase">{d.tunnelType}</span>
+          <span className="ml-1.5 text-muted-foreground uppercase text-[9px]">{d.tunnelType}</span>
+          {d.status === 'down' && (
+            <span className="ml-1.5 text-red-500 text-[9px] font-semibold">DOWN</span>
+          )}
         </div>
 
         {/* IP at source end (site A) */}
         {d.ipA && ipAPos && (
           <div
-            className="absolute rounded bg-card/90 px-1 py-0.5 text-[9px] font-mono text-muted-foreground border"
+            className="absolute rounded bg-card/90 backdrop-blur-sm px-1 py-0.5 text-[9px] font-mono text-muted-foreground border shadow-sm"
             style={{
-              borderColor: color,
+              borderColor: `${color}60`,
               transform: `translate(-50%, -50%) translate(${ipAPos.x}px,${ipAPos.y}px)`,
             }}
           >
@@ -123,9 +163,9 @@ export function TunnelEdge({ sourceX, sourceY, targetX, targetY, sourcePosition,
         {/* IP at target end (site B) */}
         {d.ipB && ipBPos && (
           <div
-            className="absolute rounded bg-card/90 px-1 py-0.5 text-[9px] font-mono text-muted-foreground border"
+            className="absolute rounded bg-card/90 backdrop-blur-sm px-1 py-0.5 text-[9px] font-mono text-muted-foreground border shadow-sm"
             style={{
-              borderColor: color,
+              borderColor: `${color}60`,
               transform: `translate(-50%, -50%) translate(${ipBPos.x}px,${ipBPos.y}px)`,
             }}
           >

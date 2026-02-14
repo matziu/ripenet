@@ -25,6 +25,12 @@
   --radius-lg: 0.5rem;
 }
 
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
 .dark {
   --color-border: #374151;
   --color-input: #374151;

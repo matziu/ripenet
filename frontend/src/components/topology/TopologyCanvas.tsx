@@ -3,6 +3,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
   Panel,
   useNodesState,
@@ -22,8 +23,9 @@ import { SiteNode } from './nodes/SiteNode'
 import { TunnelEdge } from './edges/TunnelEdge'
 import { Dialog } from '@/components/ui/Dialog'
 import { SiteForm } from '@/components/data/forms/SiteForm'
-import { LayoutGrid, Plus, MapPin, Wand2 } from 'lucide-react'
+import { Building2, LayoutGrid, Network, Plus, MapPin, Server, Wand2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import type { ProjectTopology } from '@/types'
 
 const nodeTypes: NodeTypes = {
   siteNode: SiteNode,
@@ -37,6 +39,77 @@ interface TopologyCanvasProps {
   projectId: number
 }
 
+const tunnelTypeInfo: Record<string, { color: string; label: string }> = {
+  wireguard: { color: '#8b5cf6', label: 'WireGuard' },
+  ipsec: { color: '#f59e0b', label: 'IPSec' },
+  gre: { color: '#3b82f6', label: 'GRE' },
+  vxlan: { color: '#06b6d4', label: 'VXLAN' },
+}
+
+function TopologyStats({ topology }: { topology: ProjectTopology }) {
+  const totalVlans = topology.sites.reduce((sum, s) => sum + s.vlans.length, 0)
+  const totalHosts = topology.sites.reduce(
+    (sum, s) => sum + s.vlans.reduce((vs, v) => vs + v.subnets.reduce((ss, sub) => ss + sub.hosts.length, 0), 0),
+    0,
+  )
+
+  return (
+    <Panel position="top-left">
+      <div className="flex items-center gap-3 rounded-lg border border-border/50 bg-card/90 backdrop-blur-sm px-3 py-1.5 shadow-sm text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <Building2 className="h-3 w-3" />
+          {topology.sites.length}
+        </span>
+        <span className="flex items-center gap-1">
+          <Network className="h-3 w-3" />
+          {totalVlans}
+        </span>
+        <span className="flex items-center gap-1">
+          <Server className="h-3 w-3" />
+          {totalHosts}
+        </span>
+        {topology.tunnels.length > 0 && (
+          <span className="text-muted-foreground/60">|</span>
+        )}
+        {topology.tunnels.length > 0 && (
+          <span>{topology.tunnels.length} tunnels</span>
+        )}
+      </div>
+    </Panel>
+  )
+}
+
+function TunnelLegend({ topology }: { topology: ProjectTopology }) {
+  const types = useMemo(() => {
+    const seen = new Set<string>()
+    for (const t of topology.tunnels) {
+      seen.add(t.tunnel_type)
+    }
+    return Array.from(seen)
+  }, [topology.tunnels])
+
+  if (types.length === 0) return null
+
+  return (
+    <Panel position="bottom-right">
+      <div className="rounded-lg border border-border/50 bg-card/90 backdrop-blur-sm px-3 py-2 shadow-sm">
+        <div className="text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-1.5">Tunnels</div>
+        <div className="space-y-1">
+          {types.map((type) => {
+            const info = tunnelTypeInfo[type] ?? { color: '#94a3b8', label: type }
+            return (
+              <div key={type} className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: info.color }} />
+                <span>{info.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
 function TopologyToolbar({ projectId, onRelayout }: { projectId: number; onRelayout: () => void }) {
   return (
     <Panel position="top-right">
@@ -45,7 +118,7 @@ function TopologyToolbar({ projectId, onRelayout }: { projectId: number; onRelay
           clearPositions(projectId)
           onRelayout()
         }}
-        className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-accent transition-colors"
+        className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-card/90 backdrop-blur-sm px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-accent transition-colors"
       >
         <LayoutGrid className="h-3.5 w-3.5" />
         Re-layout
@@ -127,8 +200,10 @@ function TopologyCanvasInner({ projectId }: TopologyCanvasProps) {
       maxZoom={2}
       className="bg-background"
     >
-      <Background gap={20} size={1} />
-      <Controls className="!bg-card !border-border !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-accent [&>button>svg]:!fill-foreground" />
+      <Background variant={BackgroundVariant.Dots} gap={16} size={1} className="!text-border/40" />
+      <Controls className="!bg-card !border-border/50 !shadow-md !rounded-lg [&>button]:!bg-card [&>button]:!border-border/50 [&>button]:!text-foreground [&>button:hover]:!bg-accent [&>button>svg]:!fill-foreground" />
+      <TopologyStats topology={topology} />
+      <TunnelLegend topology={topology} />
       <TopologyToolbar projectId={projectId} onRelayout={handleRelayout} />
     </ReactFlow>
   )

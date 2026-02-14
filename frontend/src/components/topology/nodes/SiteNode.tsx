@@ -29,7 +29,7 @@ function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-all',
+        'flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-all duration-150',
         color.bg,
         color.border,
         'border',
@@ -75,7 +75,6 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
   const handleSiteClick = () => {
     toggleExpandedSite(d.siteId)
     setSelectedSite(d.siteId)
-    // Also expand in sidebar if not already
     if (!expandedSiteIds.has(d.siteId)) expandSite(d.siteId)
     if (!detailPanelOpen) toggleDetailPanel()
   }
@@ -83,11 +82,11 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border-2 bg-card shadow-md transition-all',
-        d.expanded ? 'min-w-[260px]' : 'min-w-[180px]',
+        'rounded-xl border bg-card shadow-md transition-all duration-200',
+        d.expanded ? 'min-w-[280px]' : 'min-w-[200px]',
         isHighlighted
-          ? 'border-primary ring-2 ring-primary/30 shadow-lg'
-          : 'border-border hover:border-primary/50',
+          ? 'border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/10'
+          : 'border-border/60 hover:border-primary/40 hover:shadow-lg',
       )}
     >
       <Handle type="target" id="target-top" position={Position.Top} className="!w-1.5 !h-1.5 !opacity-0" />
@@ -95,25 +94,35 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
       <Handle type="source" id="source-top" position={Position.Top} className="!w-1.5 !h-1.5 !opacity-0" />
       <Handle type="source" id="source-left" position={Position.Left} className="!w-1.5 !h-1.5 !opacity-0" />
 
-      {/* Site header */}
+      {/* Site header with gradient */}
       <div
-        className="flex items-center gap-2 px-4 py-3 cursor-pointer"
+        className={cn(
+          'flex items-center gap-3 px-4 py-3 cursor-pointer rounded-t-xl',
+          'bg-gradient-to-r from-primary/5 via-primary/3 to-transparent',
+          'dark:from-primary/10 dark:via-primary/5 dark:to-transparent',
+        )}
         onClick={handleSiteClick}
       >
-        <Building2 className="h-5 w-5 text-primary shrink-0" />
+        <div className={cn(
+          'flex items-center justify-center h-8 w-8 rounded-lg shrink-0 transition-colors duration-200',
+          'bg-primary/10 dark:bg-primary/20',
+          isHighlighted && 'bg-primary/20 dark:bg-primary/30',
+        )}>
+          <Building2 className="h-4 w-4 text-primary" />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <span className="font-semibold text-sm truncate">{d.label}</span>
             {d.expanded ? (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200" />
             ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200" />
             )}
           </div>
-          <div className="flex gap-2 text-[10px] text-muted-foreground mt-0.5">
+          <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
             <span className="flex items-center gap-0.5">
               <Network className="h-3 w-3" />
-              {d.vlanCount} VLANs
+              {d.vlanCount}
             </span>
             <span>{d.hostCount} hosts</span>
           </div>
@@ -122,12 +131,12 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
 
       {/* WAN Addresses — always visible */}
       {d.wanAddresses.length > 0 && (
-        <div className="px-4 pb-1 space-y-0.5">
+        <div className="px-4 pb-1.5 pt-0.5 space-y-0.5">
           {d.wanAddresses.map((wan, i) => (
             <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-              <Globe className="h-3 w-3 shrink-0" />
+              <Globe className="h-3 w-3 shrink-0 text-sky-500/70" />
               <span className="font-mono">{wan.ip_address}</span>
-              <span className="text-[9px] opacity-70">{wan.label}</span>
+              <span className="text-[9px] opacity-60">{wan.label}</span>
             </div>
           ))}
         </div>
@@ -135,7 +144,7 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
 
       {/* Expanded VLANs */}
       {d.expanded && d.vlans.length > 0 && (
-        <div className="px-3 pb-3 space-y-1 border-t border-border/50 pt-2">
+        <div className="px-3 pb-3 space-y-1 border-t border-border/30 pt-2 mt-0.5">
           {d.vlans.map((vlan) => (
             <VlanRow key={vlan.id} vlan={vlan} />
           ))}
