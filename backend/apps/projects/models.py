@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.db import models
-from netfields import CidrAddressField, InetAddressField
+from netfields import CidrAddressField
 
 
 class Project(models.Model):
@@ -52,7 +52,7 @@ class Site(models.Model):
 
 class SiteWanAddress(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="wan_addresses")
-    ip_address = InetAddressField(help_text="WAN IP address")
+    ip_address = models.CharField(max_length=255, help_text="WAN IP or DNS hostname (e.g. 203.0.113.1, office.dyndns.org)")
     label = models.CharField(max_length=100, help_text="e.g. ISP1, Fiber, LTE backup")
     created_at = models.DateTimeField(auto_now_add=True)
 

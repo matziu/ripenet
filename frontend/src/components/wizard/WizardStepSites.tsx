@@ -197,7 +197,7 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
                   <input
                     value={wan.ip_address}
                     onChange={(e) => updateWan(site.tempId, wIdx, 'ip_address', e.target.value)}
-                    placeholder="WAN IP"
+                    placeholder="IP or hostname"
                     className="w-36 rounded border border-input bg-background px-2 py-1 text-xs font-mono"
                   />
                   <input

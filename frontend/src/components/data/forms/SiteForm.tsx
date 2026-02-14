@@ -123,7 +123,7 @@ export function SiteForm({ projectId, site, onClose }: SiteFormProps) {
                     prev.map((w, i) => (i === idx ? { ...w, ip_address: e.target.value } : w)),
                   )
                 }
-                placeholder="IP address"
+                placeholder="IP or hostname"
                 className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
               />
               <input
