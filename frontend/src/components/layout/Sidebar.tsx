@@ -11,8 +11,9 @@ import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
 import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
+import { ProjectForm } from '@/components/data/forms/ProjectForm'
 import { toast } from 'sonner'
-import type { Site, VLAN, Subnet, Host } from '@/types'
+import type { Project, Site, VLAN, Subnet, Host } from '@/types'
 import {
   FolderOpen, MapPin, Network, Server, Monitor,
   ChevronRight, ChevronDown, Plus,
@@ -91,13 +92,25 @@ function ProjectTreeItem({
   isActive,
   onSelect,
 }: {
-  project: { id: number; name: string; status: string; site_count: number }
+  project: Project
   isActive: boolean
   onSelect: () => void
 }) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [addSiteOpen, setAddSiteOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const expanded = useSelectionStore((s) => s.expandedProjectIds.has(project.id))
   const toggleExpanded = useSelectionStore((s) => s.toggleExpandedProject)
+
+  const deleteMutation = useMutation({
+    mutationFn: () => projectsApi.delete(project.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project deleted')
+      if (isActive) navigate('/projects')
+    },
+  })
 
   const { data: sitesData } = useQuery({
     queryKey: ['sites', project.id],
@@ -111,13 +124,18 @@ function ProjectTreeItem({
 
   const handleClick = () => {
     if (isActive) {
-      // Already on this project — just toggle expand/collapse
       toggleExpanded(project.id)
     } else {
-      // Navigate to project and auto-expand
       onSelect()
       if (!expanded) toggleExpanded(project.id)
     }
+  }
+
+  const confirmDelete = () => {
+    const msg = project.site_count > 0
+      ? `Project "${project.name}" contains ${project.site_count} site(s) with all their VLANs, subnets, and hosts. This action cannot be undone.\n\nAre you sure you want to delete it?`
+      : `Delete project "${project.name}"?`
+    if (window.confirm(msg)) deleteMutation.mutate()
   }
 
   return (
@@ -142,12 +160,16 @@ function ProjectTreeItem({
         {isActive && (
           <button
             onClick={(e) => { e.stopPropagation(); setAddSiteOpen(true) }}
-            className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity mr-1"
+            className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
             title="Add site"
           >
             <Plus className="h-3 w-3" />
           </button>
         )}
+        <DropdownMenu items={[
+          { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
+          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: confirmDelete },
+        ]} />
       </div>
 
       {isExpanded && sites.length > 0 && (
@@ -160,6 +182,10 @@ function ProjectTreeItem({
 
       <Dialog open={addSiteOpen} onOpenChange={setAddSiteOpen} title="Add Site">
         <SiteForm projectId={project.id} onClose={() => setAddSiteOpen(false)} />
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Project">
+        <ProjectForm project={project} onClose={() => setEditOpen(false)} />
       </Dialog>
     </div>
   )

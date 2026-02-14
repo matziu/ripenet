@@ -5,6 +5,7 @@ import { projectsApi } from '@/api/endpoints'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/ui/Dialog'
+import { ProjectForm } from '@/components/data/forms/ProjectForm'
 import { Plus, Pencil, Trash2, Wand2 } from 'lucide-react'
 import type { Project } from '@/types'
 
@@ -33,16 +34,6 @@ export function ProjectsListPage() {
     onError: () => toast.error('Failed to create project'),
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Project> }) => projectsApi.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      toast.success('Project updated')
-      setEditProject(null)
-    },
-    onError: () => toast.error('Failed to update project'),
-  })
-
   const deleteMutation = useMutation({
     mutationFn: (id: number) => projectsApi.delete(id),
     onSuccess: () => {
@@ -51,6 +42,13 @@ export function ProjectsListPage() {
     },
     onError: () => toast.error('Failed to delete project'),
   })
+
+  const confirmDelete = (project: { id: number; name: string; site_count: number }) => {
+    const msg = project.site_count > 0
+      ? `Project "${project.name}" contains ${project.site_count} site(s) with all their VLANs, subnets, and hosts. This action cannot be undone.\n\nAre you sure you want to delete it?`
+      : `Delete project "${project.name}"?`
+    if (window.confirm(msg)) deleteMutation.mutate(project.id)
+  }
 
   return (
     <div className="p-6">
@@ -167,7 +165,7 @@ export function ProjectsListPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (confirm('Delete this project?')) deleteMutation.mutate(project.id)
+                        confirmDelete(project)
                       }}
                       className="p-1 rounded hover:bg-destructive/10"
                       title="Delete"
@@ -200,94 +198,9 @@ export function ProjectsListPage() {
         title="Edit Project"
       >
         {editProject && (
-          <EditProjectForm
-            project={editProject}
-            isPending={updateMutation.isPending}
-            onSubmit={(data) => updateMutation.mutate({ id: editProject.id, data })}
-            onClose={() => setEditProject(null)}
-          />
+          <ProjectForm project={editProject} onClose={() => setEditProject(null)} />
         )}
       </Dialog>
     </div>
-  )
-}
-
-function EditProjectForm({ project, isPending, onSubmit, onClose }: {
-  project: Project
-  isPending: boolean
-  onSubmit: (data: Partial<Project>) => void
-  onClose: () => void
-}) {
-  const [name, setName] = useState(project.name)
-  const [description, setDescription] = useState(project.description)
-  const [supernet, setSupernet] = useState(project.supernet ?? '')
-  const [status, setStatus] = useState(project.status)
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSubmit({ name, description, supernet: supernet || null, status } as Partial<Project>)
-      }}
-      className="space-y-3"
-    >
-      <div>
-        <label className="text-xs font-medium">Name</label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-          required
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium">Description</label>
-        <input
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium">Supernet</label>
-          <input
-            value={supernet}
-            onChange={(e) => setSupernet(e.target.value)}
-            placeholder="e.g. 10.0.0.0/8"
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium">Status</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as Project['status'])}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-          >
-            <option value="planning">Planning</option>
-            <option value="active">Active</option>
-            <option value="completed">Completed</option>
-            <option value="archived">Archived</option>
-          </select>
-        </div>
-      </div>
-      <div className="flex gap-2 pt-2">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {isPending ? 'Saving...' : 'Update'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md border border-border px-4 py-1.5 text-sm hover:bg-accent"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
   )
 }
