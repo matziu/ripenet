@@ -46,6 +46,7 @@ export interface SiteNodeData {
   siteId: number
   expanded: boolean
   vlans: VlanEmbedded[]
+  wanAddresses: { ip_address: string; label: string }[]
   [key: string]: unknown
 }
 
@@ -65,11 +66,14 @@ const SITE_WIDTH_EXPANDED = 280
 const VLAN_ROW_HEIGHT = 36
 const SITE_EXPANDED_PADDING = 80
 
-function getSiteSize(expanded: boolean, vlanCount: number) {
-  if (!expanded) return { w: SITE_WIDTH_COLLAPSED, h: SITE_HEIGHT_COLLAPSED }
+const WAN_ROW_HEIGHT = 18
+
+function getSiteSize(expanded: boolean, vlanCount: number, wanCount = 0) {
+  const wanExtra = wanCount * WAN_ROW_HEIGHT
+  if (!expanded) return { w: SITE_WIDTH_COLLAPSED, h: SITE_HEIGHT_COLLAPSED + wanExtra }
   return {
     w: SITE_WIDTH_EXPANDED,
-    h: SITE_EXPANDED_PADDING + vlanCount * VLAN_ROW_HEIGHT,
+    h: SITE_EXPANDED_PADDING + vlanCount * VLAN_ROW_HEIGHT + wanExtra,
   }
 }
 
@@ -121,7 +125,7 @@ function applyPolygonLayout(
   if (n === 2) {
     const sizes = nodes.map((node) => {
       const d = node.data as SiteNodeData
-      return getSiteSize(d.expanded, d.vlans.length)
+      return getSiteSize(d.expanded, d.vlans.length, d.wanAddresses?.length ?? 0)
     })
     const layoutedNodes = nodes.map((node, i) => ({
       ...node,
@@ -134,7 +138,7 @@ function applyPolygonLayout(
   let maxDim = 0
   for (const node of nodes) {
     const d = node.data as SiteNodeData
-    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length, d.wanAddresses?.length ?? 0)
     maxDim = Math.max(maxDim, w, h)
   }
 
@@ -143,7 +147,7 @@ function applyPolygonLayout(
 
   const layoutedNodes = nodes.map((node, i) => {
     const d = node.data as SiteNodeData
-    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length, d.wanAddresses?.length ?? 0)
     const angle = startAngle + (2 * Math.PI * i) / n
     return {
       ...node,
@@ -161,7 +165,7 @@ function applyPolygonLayout(
 export function hasOverlaps(nodes: Node[], padding = 30): boolean {
   const boxes = nodes.map((node) => {
     const d = node.data as SiteNodeData
-    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length, d.wanAddresses?.length ?? 0)
     return {
       left: node.position.x - padding,
       right: node.position.x + w + padding,
@@ -212,7 +216,7 @@ function assignHandles(nodes: Node[], edges: Edge[]): Edge[] {
   const centerMap = new Map<string, { cx: number; cy: number }>()
   for (const node of nodes) {
     const d = node.data as SiteNodeData
-    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length, d.wanAddresses?.length ?? 0)
     centerMap.set(node.id, {
       cx: node.position.x + w / 2,
       cy: node.position.y + h / 2,
@@ -338,7 +342,7 @@ function applyDagreLayout(
 
   nodes.forEach((node) => {
     const d = node.data as SiteNodeData
-    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length, d.wanAddresses?.length ?? 0)
     g.setNode(node.id, { width: w + 40, height: h + 40 })
   })
 
@@ -351,7 +355,7 @@ function applyDagreLayout(
   const layoutedNodes = nodes.map((node) => {
     const n = g.node(node.id)
     const d = node.data as SiteNodeData
-    const { w, h } = getSiteSize(d.expanded, d.vlans.length)
+    const { w, h } = getSiteSize(d.expanded, d.vlans.length, d.wanAddresses?.length ?? 0)
     return {
       ...node,
       position: { x: n.x - w / 2, y: n.y - h / 2 },
@@ -388,6 +392,7 @@ export function topologyToFlow(
         siteId: site.id,
         expanded: isExpanded,
         vlans: isExpanded ? vlansToEmbedded(site.vlans) : [],
+        wanAddresses: site.wan_addresses ?? [],
       } satisfies SiteNodeData,
     })
   })

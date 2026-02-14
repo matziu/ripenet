@@ -37,6 +37,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         sites = (
             Site.objects.filter(project=project)
             .prefetch_related(
+                "wan_addresses",
                 Prefetch(
                     "vlans",
                     queryset=VLAN.objects.prefetch_related(
@@ -73,7 +74,7 @@ class SiteViewSet(viewsets.ModelViewSet):
         qs = Site.objects.annotate(
             vlan_count=Count("vlans", distinct=True),
             host_count=Count("vlans__subnets__hosts", distinct=True),
-        )
+        ).prefetch_related("wan_addresses")
         project_pk = self.kwargs.get("project_pk")
         if project_pk:
             qs = qs.filter(project_id=project_pk)

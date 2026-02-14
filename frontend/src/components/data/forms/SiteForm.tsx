@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi } from '@/api/endpoints'
 import { toast } from 'sonner'
-import type { Site } from '@/types'
+import { Plus, Trash2 } from 'lucide-react'
+import type { Site, SiteWanAddress } from '@/types'
 
 interface SiteFormProps {
   projectId: number
@@ -26,6 +27,7 @@ export function SiteForm({ projectId, site, onClose }: SiteFormProps) {
   const queryClient = useQueryClient()
   const [coords, setCoords] = useState({ lat: site?.latitude ?? null, lng: site?.longitude ?? null })
   const [coordsInput, setCoordsInput] = useState(formatCoords(site?.latitude ?? null, site?.longitude ?? null))
+  const [wanAddresses, setWanAddresses] = useState<SiteWanAddress[]>(site?.wan_addresses ?? [])
 
   const { register, handleSubmit } = useForm<FormValues>({
     defaultValues: site ? {
@@ -45,11 +47,13 @@ export function SiteForm({ projectId, site, onClose }: SiteFormProps) {
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
+      const filteredWan = wanAddresses.filter((w) => w.ip_address.trim())
       const payload = {
         name: data.name,
         address: data.address,
         latitude: coords.lat,
         longitude: coords.lng,
+        wan_addresses: filteredWan.map((w) => ({ ip_address: w.ip_address, label: w.label })),
       }
       return site
         ? sitesApi.update(projectId, site.id, payload)
@@ -104,6 +108,51 @@ export function SiteForm({ projectId, site, onClose }: SiteFormProps) {
           placeholder="e.g. 52.2297, 21.0122  (paste from Google Maps)"
           className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
         />
+      </div>
+
+      {/* WAN Addresses */}
+      <div>
+        <label className="text-xs font-medium">WAN Addresses</label>
+        <div className="mt-1 space-y-1.5">
+          {wanAddresses.map((wan, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                value={wan.ip_address}
+                onChange={(e) =>
+                  setWanAddresses((prev) =>
+                    prev.map((w, i) => (i === idx ? { ...w, ip_address: e.target.value } : w)),
+                  )
+                }
+                placeholder="IP address"
+                className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
+              />
+              <input
+                value={wan.label}
+                onChange={(e) =>
+                  setWanAddresses((prev) =>
+                    prev.map((w, i) => (i === idx ? { ...w, label: e.target.value } : w)),
+                  )
+                }
+                placeholder="Label (e.g. ISP1)"
+                className="w-32 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setWanAddresses((prev) => prev.filter((_, i) => i !== idx))}
+                className="p-1.5 rounded hover:bg-destructive/10"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setWanAddresses((prev) => [...prev, { ip_address: '', label: '' }])}
+          className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <Plus className="h-3 w-3" /> Add WAN address
+        </button>
       </div>
 
       <div className="flex gap-2 pt-2">

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.projects.models import Site
+from apps.projects.serializers import SiteWanAddressSerializer
 from .models import VLAN, Host, Subnet, Tunnel
 from .validators import check_ip_duplicate_in_project, check_ip_in_subnet, check_subnet_overlap
 
@@ -108,10 +109,11 @@ class VLANTopologySerializer(serializers.ModelSerializer):
 
 class SiteTopologySerializer(serializers.ModelSerializer):
     vlans = VLANTopologySerializer(many=True, read_only=True)
+    wan_addresses = SiteWanAddressSerializer(many=True, read_only=True)
 
     class Meta:
         model = Site
-        fields = ["id", "name", "address", "latitude", "longitude", "vlans"]
+        fields = ["id", "name", "address", "latitude", "longitude", "wan_addresses", "vlans"]
 
 
 class TunnelTopologySerializer(serializers.ModelSerializer):

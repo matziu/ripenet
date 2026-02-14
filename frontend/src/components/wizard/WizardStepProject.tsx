@@ -85,6 +85,7 @@ function topologyToWizardState(
       supernet: '',
       latitude: st.latitude,
       longitude: st.longitude,
+      wanAddresses: (st.wan_addresses ?? []).map((w) => ({ ip_address: w.ip_address, label: w.label })),
       realId: st.id,
     })
 

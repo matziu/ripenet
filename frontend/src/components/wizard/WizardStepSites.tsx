@@ -1,4 +1,4 @@
-import { Plus, Trash2, MapPin } from 'lucide-react'
+import { Globe, Plus, Trash2, MapPin } from 'lucide-react'
 import type { WizardState } from '@/lib/wizard.types'
 import { tempId } from '@/lib/wizard.utils'
 
@@ -15,7 +15,7 @@ const COORDS_RE = /^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/
 export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
   const addSite = () => {
     onChange({
-      sites: [...state.sites, { tempId: tempId(), name: '', address: '', supernet: '', latitude: null, longitude: null }],
+      sites: [...state.sites, { tempId: tempId(), name: '', address: '', supernet: '', latitude: null, longitude: null, wanAddresses: [] }],
     })
   }
 
@@ -57,6 +57,36 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
 
   const toggleSiteSupernets = (enabled: boolean) => {
     onChange({ siteSupernetsEnabled: enabled })
+  }
+
+  const addWan = (siteTempId: string) => {
+    onChange({
+      sites: state.sites.map((s) =>
+        s.tempId === siteTempId
+          ? { ...s, wanAddresses: [...s.wanAddresses, { ip_address: '', label: '' }] }
+          : s,
+      ),
+    })
+  }
+
+  const removeWan = (siteTempId: string, idx: number) => {
+    onChange({
+      sites: state.sites.map((s) =>
+        s.tempId === siteTempId
+          ? { ...s, wanAddresses: s.wanAddresses.filter((_, i) => i !== idx) }
+          : s,
+      ),
+    })
+  }
+
+  const updateWan = (siteTempId: string, idx: number, field: 'ip_address' | 'label', value: string) => {
+    onChange({
+      sites: state.sites.map((s) =>
+        s.tempId === siteTempId
+          ? { ...s, wanAddresses: s.wanAddresses.map((w, i) => (i === idx ? { ...w, [field]: value } : w)) }
+          : s,
+      ),
+    })
   }
 
   const valid =
@@ -157,6 +187,40 @@ export function WizardStepSites({ state, onChange, onNext, onBack }: Props) {
                 title="Remove"
               >
                 <Trash2 className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            {/* WAN addresses sub-section */}
+            <div className="ml-8 mt-1 space-y-1">
+              {site.wanAddresses.map((wan, wIdx) => (
+                <div key={wIdx} className="flex items-center gap-1.5">
+                  <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
+                  <input
+                    value={wan.ip_address}
+                    onChange={(e) => updateWan(site.tempId, wIdx, 'ip_address', e.target.value)}
+                    placeholder="WAN IP"
+                    className="w-36 rounded border border-input bg-background px-2 py-1 text-xs font-mono"
+                  />
+                  <input
+                    value={wan.label}
+                    onChange={(e) => updateWan(site.tempId, wIdx, 'label', e.target.value)}
+                    placeholder="Label"
+                    className="w-24 rounded border border-input bg-background px-2 py-1 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeWan(site.tempId, wIdx)}
+                    className="p-0.5 rounded hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => addWan(site.tempId)}
+                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                <Plus className="h-3 w-3" /> WAN
               </button>
             </div>
           </div>

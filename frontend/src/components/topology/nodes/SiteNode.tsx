@@ -6,7 +6,7 @@ import { getVlanColor } from '@/lib/topology.utils'
 import { useTopologyStore } from '@/stores/topology.store'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
-import { Building2, ChevronDown, ChevronRight, Network } from 'lucide-react'
+import { Building2, ChevronDown, ChevronRight, Globe, Network } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
@@ -119,6 +119,19 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
           </div>
         </div>
       </div>
+
+      {/* WAN Addresses — always visible */}
+      {d.wanAddresses.length > 0 && (
+        <div className="px-4 pb-1 space-y-0.5">
+          {d.wanAddresses.map((wan, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <Globe className="h-3 w-3 shrink-0" />
+              <span className="font-mono">{wan.ip_address}</span>
+              <span className="text-[9px] opacity-70">{wan.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Expanded VLANs */}
       {d.expanded && d.vlans.length > 0 && (

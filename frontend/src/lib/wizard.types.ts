@@ -7,6 +7,7 @@ export interface WizardSite {
   supernet: string
   latitude: number | null
   longitude: number | null
+  wanAddresses: { ip_address: string; label: string }[]
   realId?: number
 }
 

@@ -20,6 +20,12 @@ export interface Project {
   updated_at: string
 }
 
+export interface SiteWanAddress {
+  id?: number
+  ip_address: string
+  label: string
+}
+
 export interface Site {
   id: number
   project: number
@@ -30,6 +36,7 @@ export interface Site {
   longitude: number | null
   vlan_count: number
   host_count: number
+  wan_addresses: SiteWanAddress[]
   created_at: string
   updated_at: string
 }
@@ -126,6 +133,7 @@ export interface SiteTopology {
   address: string
   latitude: number | null
   longitude: number | null
+  wan_addresses: SiteWanAddress[]
   vlans: VLANTopology[]
 }
 

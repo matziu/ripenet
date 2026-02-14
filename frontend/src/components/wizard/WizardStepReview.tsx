@@ -85,9 +85,21 @@ export function WizardStepReview({ state, onBack }: Props) {
           supernet: state.siteSupernetsEnabled && site.supernet?.trim() ? site.supernet.trim() : null,
           latitude: site.latitude,
           longitude: site.longitude,
+          wan_addresses: site.wanAddresses.filter((w) => w.ip_address.trim()),
         })
         siteIdMap.set(site.tempId, res.data.id)
         setProgress({ phase: 'sites', current: i + 1, total: newSites.length })
+      }
+
+      // 2b. Update existing sites with WAN addresses if changed
+      const existingSites = state.sites.filter((s) => s.realId)
+      for (const site of existingSites) {
+        const wanFiltered = site.wanAddresses.filter((w) => w.ip_address.trim())
+        if (wanFiltered.length > 0) {
+          await sitesApi.update(projectId, site.realId!, {
+            wan_addresses: wanFiltered,
+          })
+        }
       }
 
       // 3. VLANs — skip existing ones (realVlanId set), create new
@@ -240,6 +252,11 @@ export function WizardStepReview({ state, onBack }: Props) {
                   {hasOverride && (
                     <span className="ml-1 font-mono text-xs text-blue-500">
                       ({s.supernet.trim()})
+                    </span>
+                  )}
+                  {s.wanAddresses.filter((w) => w.ip_address.trim()).length > 0 && (
+                    <span className="ml-1 font-mono text-xs text-muted-foreground">
+                      {s.wanAddresses.filter((w) => w.ip_address.trim()).map((w) => w.ip_address).join(', ')}
                     </span>
                   )}
                   {s.latitude != null && s.longitude != null && (
