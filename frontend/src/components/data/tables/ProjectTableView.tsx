@@ -12,7 +12,7 @@ import { HostForm } from '@/components/data/forms/HostForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { cn } from '@/lib/utils'
 import {
-  Plus, Pencil, Trash2,
+  Plus, Pencil, Trash2, Globe,
   Building2, Network, Server, ChevronDown, ChevronRight, MapPin, Wand2,
 } from 'lucide-react'
 import type { TableTab } from '@/pages/ProjectPage'
@@ -253,7 +253,20 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                         </span>
                       </button>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground text-xs">{siteNode.site.address || '-'}</td>
+                    <td className="px-3 py-2 text-muted-foreground text-xs">
+                      {siteNode.site.address || '-'}
+                      {siteNode.site.wan_addresses?.length > 0 && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                          {siteNode.site.wan_addresses.map((w, i) => (
+                            <span key={i} className="inline-flex items-center gap-1">
+                              <Globe className="h-3 w-3 shrink-0" />
+                              <span className="font-mono">{w.ip_address}</span>
+                              <span className="opacity-70">{w.label}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-2"></td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-0.5">
