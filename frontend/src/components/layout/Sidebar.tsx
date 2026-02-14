@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { projectsApi, sitesApi, vlansApi, subnetsApi, hostsApi } from '@/api/endpoints'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
@@ -27,7 +27,13 @@ interface SidebarProps {
 export function Sidebar({ className, style }: SidebarProps) {
   const navigate = useNavigate()
   const { projectId } = useParams()
+  const location = useLocation()
   const setSelectedProject = useSelectionStore((s) => s.setSelectedProject)
+
+  // Derive view suffix from current URL to preserve it when switching projects
+  const viewSuffix = projectId
+    ? (location.pathname.split(`/projects/${projectId}`)[1] ?? '').replace(/^\//, '')
+    : ''
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
@@ -64,7 +70,8 @@ export function Sidebar({ className, style }: SidebarProps) {
               isActive={String(project.id) === projectId}
               onSelect={() => {
                 setSelectedProject(project.id)
-                navigate(`/projects/${project.id}`)
+                const suffix = viewSuffix ? `/${viewSuffix}` : ''
+                navigate(`/projects/${project.id}${suffix}`)
               }}
             />
           ))}
