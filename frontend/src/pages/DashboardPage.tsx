@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { projectsApi } from '@/api/endpoints'
-import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Dialog } from '@/components/ui/Dialog'
 import { ProjectForm } from '@/components/data/forms/ProjectForm'
 import { toast } from 'sonner'
@@ -105,7 +104,6 @@ export function DashboardPage() {
                 >
                   <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
-                <StatusBadge status={project.status} />
               </div>
             </div>
             {project.description && (

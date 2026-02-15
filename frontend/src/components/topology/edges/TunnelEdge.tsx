@@ -12,7 +12,7 @@ const tunnelTypeColors: Record<string, string> = {
 }
 
 const statusStyles: Record<string, { dasharray?: string; opacity: number; animate: boolean }> = {
-  active: { opacity: 1, animate: true },
+  active: { dasharray: '8 4', opacity: 1, animate: true },
   planned: { dasharray: '8 4', opacity: 0.5, animate: false },
   down: { dasharray: '4 4', opacity: 0.4, animate: false },
 }

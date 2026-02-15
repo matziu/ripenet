@@ -11,7 +11,6 @@ export interface Project {
   id: number
   name: string
   description: string
-  status: 'planning' | 'active' | 'completed' | 'archived'
   supernet: string | null
   created_by: number | null
   created_by_username: string | null

@@ -104,7 +104,7 @@ class ProjectPDFView(APIView):
         <body>
         <h1>{project.name}</h1>
         <p>{project.description}</p>
-        <p>Status: {project.status} | Supernet: {project.supernet or 'N/A'}</p>
+        <p>Supernet: {project.supernet or 'N/A'}</p>
         """
 
         for site in sites:

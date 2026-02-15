@@ -14,7 +14,6 @@ export function ProjectForm({ project, onClose }: ProjectFormProps) {
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description)
   const [supernet, setSupernet] = useState(project.supernet ?? '')
-  const [status, setStatus] = useState(project.status)
 
   const mutation = useMutation({
     mutationFn: (data: Partial<Project>) => projectsApi.update(project.id, data),
@@ -31,7 +30,7 @@ export function ProjectForm({ project, onClose }: ProjectFormProps) {
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        mutation.mutate({ name, description, supernet: supernet || null, status } as Partial<Project>)
+        mutation.mutate({ name, description, supernet: supernet || null } as Partial<Project>)
       }}
       className="space-y-3"
     >
@@ -52,29 +51,14 @@ export function ProjectForm({ project, onClose }: ProjectFormProps) {
           className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium">Supernet</label>
-          <input
-            value={supernet}
-            onChange={(e) => setSupernet(e.target.value)}
-            placeholder="e.g. 10.0.0.0/8"
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium">Status</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as Project['status'])}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-          >
-            <option value="planning">Planning</option>
-            <option value="active">Active</option>
-            <option value="completed">Completed</option>
-            <option value="archived">Archived</option>
-          </select>
-        </div>
+      <div>
+        <label className="text-xs font-medium">Supernet</label>
+        <input
+          value={supernet}
+          onChange={(e) => setSupernet(e.target.value)}
+          placeholder="e.g. 10.0.0.0/8"
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
+        />
       </div>
       <div className="flex gap-2 pt-2">
         <button

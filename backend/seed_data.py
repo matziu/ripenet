@@ -19,7 +19,6 @@ print("Creating seed data...")
 p1 = Project.objects.create(
     name="Inwestycja Kraków",
     description="Sieć biurowa Kraków — 3 lokalizacje, tunele GRE",
-    status="active",
     supernet="10.0.0.0/16",
     created_by=admin,
 )
@@ -154,7 +153,6 @@ Tunnel.objects.create(
 p2 = Project.objects.create(
     name="Sieć Warszawa",
     description="Nowa sieć biurowa — etap planowania",
-    status="planning",
     supernet="10.10.0.0/16",
     created_by=admin,
 )

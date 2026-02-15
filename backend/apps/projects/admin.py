@@ -10,8 +10,8 @@ class SiteInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("name", "status", "supernet", "created_by", "created_at")
-    list_filter = ("status",)
+    list_display = ("name", "supernet", "created_by", "created_at")
+    list_filter = ()
     search_fields = ("name", "description")
     inlines = [SiteInline]
 

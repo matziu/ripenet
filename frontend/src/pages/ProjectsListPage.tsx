@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { projectsApi } from '@/api/endpoints'
-import { StatusBadge } from '@/components/shared/StatusBadge'
+
 import { toast } from 'sonner'
 import { Dialog } from '@/components/ui/Dialog'
 import { ProjectForm } from '@/components/data/forms/ProjectForm'
@@ -127,7 +127,7 @@ export function ProjectsListPage() {
           <thead>
             <tr className="border-b border-border bg-muted/50">
               <th className="px-3 md:px-4 py-3 text-left font-medium">Name</th>
-              <th className="px-3 md:px-4 py-3 text-left font-medium">Status</th>
+
               <th className="px-3 md:px-4 py-3 text-left font-medium hidden sm:table-cell">Supernet</th>
               <th className="px-3 md:px-4 py-3 text-left font-medium">Sites</th>
               <th className="px-3 md:px-4 py-3 text-left font-medium hidden md:table-cell">Created</th>
@@ -142,9 +142,6 @@ export function ProjectsListPage() {
                 onClick={() => navigate(`/projects/${project.id}`)}
               >
                 <td className="px-3 md:px-4 py-3 font-medium">{project.name}</td>
-                <td className="px-3 md:px-4 py-3">
-                  <StatusBadge status={project.status} />
-                </td>
                 <td className="px-3 md:px-4 py-3 font-mono text-xs hidden sm:table-cell">{project.supernet ?? '-'}</td>
                 <td className="px-3 md:px-4 py-3">{project.site_count}</td>
                 <td className="px-3 md:px-4 py-3 text-muted-foreground hidden md:table-cell">
@@ -178,12 +175,12 @@ export function ProjectsListPage() {
             ))}
             {isLoading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading...</td>
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Loading...</td>
               </tr>
             )}
             {!isLoading && projects?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                   No projects yet. Create your first one above.
                 </td>
               </tr>

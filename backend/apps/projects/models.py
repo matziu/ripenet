@@ -4,15 +4,8 @@ from netfields import CidrAddressField
 
 
 class Project(models.Model):
-    class Status(models.TextChoices):
-        PLANNING = "planning", "Planning"
-        ACTIVE = "active", "Active"
-        COMPLETED = "completed", "Completed"
-        ARCHIVED = "archived", "Archived"
-
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLANNING)
     supernet = CidrAddressField(blank=True, null=True, help_text="Top-level address space for this project")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

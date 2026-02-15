@@ -16,7 +16,7 @@ from .serializers import ProjectListSerializer, ProjectSerializer, SiteSerialize
 class ProjectViewSet(viewsets.ModelViewSet):
     permission_classes = [ProjectPermission]
     search_fields = ["name", "description"]
-    ordering_fields = ["name", "created_at", "status"]
+    ordering_fields = ["name", "created_at"]
 
     def get_queryset(self):
         return Project.objects.annotate(

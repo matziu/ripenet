@@ -4,7 +4,7 @@ import { projectsApi } from '@/api/endpoints'
 import { TopologyCanvas } from '@/components/topology/TopologyCanvas'
 import { GeoMap } from '@/components/geo/GeoMap'
 import { ProjectTableView } from '@/components/data/tables/ProjectTableView'
-import { StatusBadge } from '@/components/shared/StatusBadge'
+
 import { useEffect } from 'react'
 import { useSelectionStore } from '@/stores/selection.store'
 
@@ -76,7 +76,7 @@ export function ProjectPage() {
       {/* Project header */}
       <div className="flex items-center gap-2 md:gap-3 border-b border-border px-3 md:px-4 py-2 bg-card/50">
         <h2 className="text-sm font-semibold truncate">{project.name}</h2>
-        <StatusBadge status={project.status} />
+
         {project.supernet && (
           <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{project.supernet}</span>
         )}
