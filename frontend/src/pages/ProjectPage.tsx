@@ -8,19 +8,11 @@ import { ProjectTableView } from '@/components/data/tables/ProjectTableView'
 import { useEffect } from 'react'
 import { useSelectionStore } from '@/stores/selection.store'
 
-const TAB_NAMES = ['network', 'tunnels'] as const
-export type TableTab = (typeof TAB_NAMES)[number]
-
-function parseWildcard(wildcard: string | undefined) {
-  if (!wildcard) return { view: 'topology' as const, tab: undefined }
-  const parts = wildcard.split('/')
-  const view = parts[0] as 'topology' | 'geo' | 'table'
-  if (view === 'table') {
-    const tab = parts[1] as TableTab | undefined
-    return { view, tab: tab && TAB_NAMES.includes(tab) ? tab : undefined }
-  }
-  if (view === 'topology' || view === 'geo') return { view, tab: undefined }
-  return { view: undefined, tab: undefined }
+function parseView(wildcard: string | undefined) {
+  if (!wildcard) return undefined
+  const view = wildcard.split('/')[0] as 'topology' | 'geo' | 'table'
+  if (view === 'topology' || view === 'geo' || view === 'table') return view
+  return undefined
 }
 
 export function ProjectPage() {
@@ -29,7 +21,7 @@ export function ProjectPage() {
   const navigate = useNavigate()
   const setSelectedProject = useSelectionStore((s) => s.setSelectedProject)
 
-  const { view, tab } = parseWildcard(wildcard)
+  const view = parseView(wildcard)
 
   useEffect(() => {
     setSelectedProject(id)
@@ -46,7 +38,7 @@ export function ProjectPage() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
-      if (e.key === '1') navigate(`/projects/${id}/table/network`, { replace: true })
+      if (e.key === '1') navigate(`/projects/${id}/table`, { replace: true })
       else if (e.key === '2') navigate(`/projects/${id}/topology`, { replace: true })
       else if (e.key === '3') navigate(`/projects/${id}/geo`, { replace: true })
     }
@@ -57,10 +49,6 @@ export function ProjectPage() {
   // Redirect bare /projects/:id to /projects/:id/topology
   if (!view) {
     return <Navigate to={`/projects/${id}/topology`} replace />
-  }
-  // Redirect /projects/:id/table to /projects/:id/table/network
-  if (view === 'table' && !tab) {
-    return <Navigate to={`/projects/${id}/table/network`} replace />
   }
 
   if (!project) {
@@ -91,7 +79,7 @@ export function ProjectPage() {
       <div className="flex-1 overflow-hidden">
         {view === 'topology' && <TopologyCanvas projectId={id} />}
         {view === 'geo' && <GeoMap projectId={id} />}
-        {view === 'table' && tab && <ProjectTableView projectId={id} activeTab={tab} />}
+        {view === 'table' && <ProjectTableView projectId={id} />}
       </div>
     </div>
   )

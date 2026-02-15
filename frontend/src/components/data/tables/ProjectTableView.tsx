@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
@@ -13,10 +13,9 @@ import { HostForm } from '@/components/data/forms/HostForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { cn } from '@/lib/utils'
 import {
-  Plus, Pencil, Trash2, Globe,
+  Plus, Pencil, Trash2, Globe, Cable,
   Building2, Network, Server, ChevronDown, ChevronRight, MapPin, Wand2,
 } from 'lucide-react'
-import type { TableTab } from '@/pages/ProjectPage'
 import type { Site, VLAN, Subnet, Host, Tunnel } from '@/types'
 
 // ─── Tree node types ──────────────────────────────────────────
@@ -41,40 +40,13 @@ interface SubnetNode {
 
 interface ProjectTableViewProps {
   projectId: number
-  activeTab: TableTab
 }
 
-export function ProjectTableView({ projectId, activeTab }: ProjectTableViewProps) {
-  const navigate = useNavigate()
-  const { projectId: pid } = useParams()
-
-  const tabs: { id: TableTab; label: string }[] = [
-    { id: 'network', label: 'Network' },
-    { id: 'tunnels', label: 'Tunnels' },
-  ]
-
+export function ProjectTableView({ projectId }: ProjectTableViewProps) {
   return (
     <div className="h-full flex flex-col">
-      <div className="flex border-b border-border bg-card/50">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => navigate(`/projects/${pid}/table/${tab.id}`)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
-              activeTab === tab.id
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       <div className="flex-1 overflow-auto p-2 md:p-4">
-        {activeTab === 'network' && <NetworkHierarchy projectId={projectId} />}
-        {activeTab === 'tunnels' && <TunnelsTable projectId={projectId} />}
+        <NetworkHierarchy projectId={projectId} />
       </div>
     </div>
   )
@@ -105,6 +77,11 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
   const { data: hosts } = useQuery({
     queryKey: ['hosts', { project: projectId }],
     queryFn: () => hostsApi.list({ project: String(projectId) }),
+    select: (res) => res.data.results,
+  })
+  const { data: tunnels } = useQuery({
+    queryKey: ['tunnels', { project: projectId }],
+    queryFn: () => tunnelsApi.list({ project: String(projectId) }),
     select: (res) => res.data.results,
   })
 
@@ -185,11 +162,11 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
 
   // CRUD dialog state
   const [dialog, setDialog] = useState<{
-    type: 'site' | 'vlan' | 'subnet' | 'host'
+    type: 'site' | 'vlan' | 'subnet' | 'host' | 'tunnel'
     mode: 'add' | 'edit'
     parentId?: number
     siteId?: number
-    entity?: Site | VLAN | Subnet | Host
+    entity?: Site | VLAN | Subnet | Host | Tunnel
   } | null>(null)
 
   const closeDialog = () => setDialog(null)
@@ -211,8 +188,13 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
     mutationFn: (id: number) => hostsApi.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['hosts'] }); queryClient.invalidateQueries({ queryKey: ['topology'] }) },
   })
+  const deleteTunnel = useMutation({
+    mutationFn: (id: number) => tunnelsApi.delete(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tunnels'] }); queryClient.invalidateQueries({ queryKey: ['topology'] }) },
+  })
 
   const totalHosts = hosts?.length ?? 0
+  const totalTunnels = tunnels?.length ?? 0
 
   return (
     <>
@@ -220,7 +202,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
       <div className="flex items-center justify-between mb-3 gap-2">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <h3 className="text-xs md:text-sm font-medium text-muted-foreground truncate">
-            {sites?.length ?? 0} sites, {vlans?.length ?? 0} VLANs, {subnets?.length ?? 0} subnets, {totalHosts} hosts
+            {sites?.length ?? 0} sites, {vlans?.length ?? 0} VLANs, {subnets?.length ?? 0} subnets, {totalHosts} hosts, {totalTunnels} tunnels
           </h3>
           <div className="flex gap-1 text-[10px] shrink-0">
             <button onClick={expandAll} className="rounded border border-border px-1.5 py-0.5 hover:bg-accent text-muted-foreground">
@@ -231,12 +213,20 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
             </button>
           </div>
         </div>
-        <button
-          onClick={() => setDialog({ type: 'site', mode: 'add' })}
-          className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 shrink-0"
-        >
-          <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add</span> Site
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => setDialog({ type: 'tunnel', mode: 'add' })}
+            className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent shrink-0"
+          >
+            <Cable className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add</span> Tunnel
+          </button>
+          <button
+            onClick={() => setDialog({ type: 'site', mode: 'add' })}
+            className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 shrink-0"
+          >
+            <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Add</span> Site
+          </button>
+        </div>
       </div>
 
       {/* Tree table */}
@@ -360,7 +350,55 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                 </TreeFragment>
               )
             })}
-            {tree.length === 0 && (
+            {/* Tunnels section */}
+            {tunnels && tunnels.length > 0 && (
+              <tr className="border-b border-border bg-muted/10">
+                <td colSpan={4} className="px-2 md:px-3 py-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-1.5">
+                      <Cable className="h-3 w-3" /> Tunnels ({tunnels.length})
+                    </span>
+                    <button
+                      onClick={() => setDialog({ type: 'tunnel', mode: 'add' })}
+                      className="p-0.5 rounded hover:bg-accent"
+                      title="Add tunnel"
+                    >
+                      <Plus className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {tunnels?.map((tunnel) => (
+              <tr key={`tunnel-${tunnel.id}`} className="border-b border-border hover:bg-accent/20">
+                <td className="px-2 md:px-3 py-1.5 pl-6 md:pl-8">
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <Cable className="h-3.5 w-3.5 text-purple-500" />
+                    {tunnel.name}
+                    <span className="text-[10px] uppercase text-muted-foreground font-normal">{tunnel.tunnel_type}</span>
+                  </span>
+                </td>
+                <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
+                  <span className="font-mono">{tunnel.tunnel_subnet}</span>
+                  {' · '}
+                  {tunnel.site_a_name} (<CopyableIP ip={tunnel.ip_a} />) → {tunnel.site_b_name} (<CopyableIP ip={tunnel.ip_b} />)
+                </td>
+                <td className="px-2 md:px-3 py-1.5 hidden md:table-cell">
+                  <StatusBadge status={tunnel.status} />
+                </td>
+                <td className="px-2 md:px-3 py-1.5">
+                  <div className="flex justify-end gap-0.5">
+                    <button onClick={() => setDialog({ type: 'tunnel', mode: 'edit', entity: tunnel })} className="p-1 rounded hover:bg-accent" title="Edit tunnel">
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                    <button onClick={() => { if (window.confirm(`Delete tunnel "${tunnel.name}"?`)) deleteTunnel.mutate(tunnel.id) }} className="p-1 rounded hover:bg-destructive/20" title="Delete tunnel">
+                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {tree.length === 0 && (!tunnels || tunnels.length === 0) && (
               <tr>
                 <td colSpan={4} className="px-4 py-12">
                   <div className="flex flex-col items-center gap-4">
@@ -436,89 +474,15 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
           />
         </Dialog>
       )}
-    </>
-  )
-}
-
-// ─── Tunnels ──────────────────────────────────────────────────
-
-function TunnelsTable({ projectId }: { projectId: number }) {
-  const queryClient = useQueryClient()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editTunnel, setEditTunnel] = useState<Tunnel | undefined>()
-
-  const { data: tunnels } = useQuery({
-    queryKey: ['tunnels', { project: projectId }],
-    queryFn: () => tunnelsApi.list({ project: String(projectId) }),
-    select: (res) => res.data.results,
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => tunnelsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tunnels'] })
-      queryClient.invalidateQueries({ queryKey: ['topology'] })
-    },
-  })
-
-  const openAdd = () => { setEditTunnel(undefined); setDialogOpen(true) }
-  const openEdit = (tunnel: Tunnel) => { setEditTunnel(tunnel); setDialogOpen(true) }
-  const handleDelete = (tunnel: Tunnel) => {
-    if (window.confirm(`Delete tunnel "${tunnel.name}"?`)) deleteMutation.mutate(tunnel.id)
-  }
-
-  return (
-    <>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-muted-foreground">{tunnels?.length ?? 0} tunnels</h3>
-        <button onClick={openAdd} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
-          <Plus className="h-3.5 w-3.5" /> Add Tunnel
-        </button>
-      </div>
-      <div className="rounded-md border border-border overflow-x-auto">
-        <table className="w-full text-sm min-w-[600px]">
-          <thead>
-            <tr className="border-b border-border bg-muted/50 text-left">
-              <th className="px-2 md:px-3 py-2 font-medium">Name</th>
-              <th className="px-2 md:px-3 py-2 font-medium hidden sm:table-cell">Type</th>
-              <th className="px-2 md:px-3 py-2 font-medium hidden md:table-cell">Subnet</th>
-              <th className="px-2 md:px-3 py-2 font-medium">Site A</th>
-              <th className="px-2 md:px-3 py-2 font-medium">IP A</th>
-              <th className="px-2 md:px-3 py-2 font-medium">Site B</th>
-              <th className="px-2 md:px-3 py-2 font-medium">IP B</th>
-              <th className="px-2 md:px-3 py-2 font-medium hidden sm:table-cell">Status</th>
-              <th className="px-2 md:px-3 py-2 font-medium w-16 md:w-20"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {tunnels?.map((tunnel) => (
-              <tr key={tunnel.id} className="border-b border-border hover:bg-accent/30">
-                <td className="px-2 md:px-3 py-2 font-medium">{tunnel.name}</td>
-                <td className="px-2 md:px-3 py-2 uppercase text-xs hidden sm:table-cell">{tunnel.tunnel_type}</td>
-                <td className="px-2 md:px-3 py-2 font-mono text-xs hidden md:table-cell">{tunnel.tunnel_subnet}</td>
-                <td className="px-2 md:px-3 py-2">{tunnel.site_a_name}</td>
-                <td className="px-2 md:px-3 py-2"><CopyableIP ip={tunnel.ip_a} /></td>
-                <td className="px-2 md:px-3 py-2">{tunnel.site_b_name}</td>
-                <td className="px-2 md:px-3 py-2"><CopyableIP ip={tunnel.ip_b} /></td>
-                <td className="px-2 md:px-3 py-2 hidden sm:table-cell"><StatusBadge status={tunnel.status} /></td>
-                <td className="px-2 md:px-3 py-2">
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(tunnel)} className="p-1 rounded hover:bg-accent" title="Edit">
-                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                    <button onClick={() => handleDelete(tunnel)} className="p-1 rounded hover:bg-destructive/20" title="Delete">
-                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen} title={editTunnel ? 'Edit Tunnel' : 'Add Tunnel'}>
-        <TunnelForm projectId={projectId} tunnel={editTunnel} onClose={() => setDialogOpen(false)} />
-      </Dialog>
+      {dialog?.type === 'tunnel' && (
+        <Dialog open onOpenChange={closeDialog} title={dialog.mode === 'edit' ? 'Edit Tunnel' : 'Add Tunnel'}>
+          <TunnelForm
+            projectId={projectId}
+            tunnel={dialog.mode === 'edit' ? (dialog.entity as Tunnel) : undefined}
+            onClose={closeDialog}
+          />
+        </Dialog>
+      )}
     </>
   )
 }
