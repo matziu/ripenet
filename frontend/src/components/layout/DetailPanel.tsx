@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui.store'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useTopologyStore } from '@/stores/topology.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { sitesApi, vlansApi, subnetsApi, hostsApi } from '@/api/endpoints'
+import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
 import { cn } from '@/lib/utils'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
@@ -12,11 +12,13 @@ import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
 import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
+import { TunnelForm } from '@/components/data/forms/TunnelForm'
+import { StatusBadge } from '@/components/shared/StatusBadge'
 import { toast } from 'sonner'
 import type { Host } from '@/types'
 import {
   X, Pencil, Trash2, Plus,
-  MapPin, Network, Server, Monitor,
+  MapPin, Network, Server, Monitor, Cable,
 } from 'lucide-react'
 
 export function DetailPanel({ className }: { className?: string }) {
@@ -27,21 +29,24 @@ export function DetailPanel({ className }: { className?: string }) {
   const selectedVlanId = useSelectionStore((s) => s.selectedVlanId)
   const selectedSubnetId = useSelectionStore((s) => s.selectedSubnetId)
   const selectedHostId = useSelectionStore((s) => s.selectedHostId)
+  const selectedTunnelId = useSelectionStore((s) => s.selectedTunnelId)
   const selectedProjectId = useSelectionStore((s) => s.selectedProjectId)
 
   // Also listen to topology store for VLAN clicks from the topology view
   const topoVlanId = useTopologyStore((s) => s.selectedVlanId)
 
-  // Priority: Host > Subnet > VLAN (sidebar or topology) > Site
+  // Priority: Host > Subnet > VLAN (sidebar or topology) > Tunnel > Site
   const activeView = selectedHostId
     ? 'host'
     : selectedSubnetId
       ? 'subnet'
       : (selectedVlanId || topoVlanId)
         ? 'vlan'
-        : selectedSiteId
-          ? 'site'
-          : null
+        : selectedTunnelId
+          ? 'tunnel'
+          : selectedSiteId
+            ? 'site'
+            : null
 
   const effectiveVlanId = selectedVlanId || topoVlanId
 
@@ -62,6 +67,9 @@ export function DetailPanel({ className }: { className?: string }) {
       )}
       {activeView === 'subnet' && selectedSubnetId && (
         <SubnetDetail subnetId={selectedSubnetId} />
+      )}
+      {activeView === 'tunnel' && selectedTunnelId && selectedProjectId && (
+        <TunnelDetail tunnelId={selectedTunnelId} projectId={selectedProjectId} />
       )}
       {activeView === 'host' && selectedHostId && (
         <HostDetail hostId={selectedHostId} />
@@ -292,6 +300,65 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
 
       <Dialog open={addHostOpen} onOpenChange={setAddHostOpen} title="Add Host">
         <HostForm subnetId={subnetId} onClose={() => setAddHostOpen(false)} />
+      </Dialog>
+    </div>
+  )
+}
+
+// ── Tunnel Detail ────────────────────────────────────────────
+
+function TunnelDetail({ tunnelId, projectId }: { tunnelId: number; projectId: number }) {
+  const queryClient = useQueryClient()
+  const [editOpen, setEditOpen] = useState(false)
+
+  const { data: tunnel } = useQuery({
+    queryKey: ['tunnel', tunnelId],
+    queryFn: () => tunnelsApi.get(tunnelId),
+    select: (res) => res.data,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => tunnelsApi.delete(tunnelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tunnels'] })
+      queryClient.invalidateQueries({ queryKey: ['topology'] })
+      useSelectionStore.getState().setSelectedTunnel(null)
+      toast.success('Tunnel deleted')
+    },
+  })
+
+  if (!tunnel) return <DetailLoading />
+
+  return (
+    <div className="p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Cable className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-semibold">{tunnel.name}</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <StatusBadge status={tunnel.status} />
+        <span className="text-xs uppercase text-muted-foreground">{tunnel.tunnel_type}</span>
+      </div>
+
+      <dl className="space-y-1.5 text-xs">
+        <DetailRow label="Subnet" value={tunnel.tunnel_subnet} mono />
+        <DetailRow label="Site A" value={tunnel.site_a_name} />
+        <DetailRow label="IP A" value={tunnel.ip_a} mono />
+        <DetailRow label="Site B" value={tunnel.site_b_name} />
+        <DetailRow label="IP B" value={tunnel.ip_b} mono />
+        {tunnel.description && <DetailRow label="Description" value={tunnel.description} />}
+      </dl>
+
+      <DetailActions
+        onEdit={() => setEditOpen(true)}
+        onDelete={() => {
+          if (window.confirm(`Delete tunnel "${tunnel.name}"?`)) deleteMutation.mutate()
+        }}
+      />
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Tunnel">
+        <TunnelForm projectId={projectId} tunnel={tunnel} onClose={() => setEditOpen(false)} />
       </Dialog>
     </div>
   )
