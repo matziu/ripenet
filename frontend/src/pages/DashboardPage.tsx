@@ -1,16 +1,45 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { projectsApi } from '@/api/endpoints'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { FolderOpen, Plus, MapPin, Wand2 } from 'lucide-react'
+import { Dialog } from '@/components/ui/Dialog'
+import { ProjectForm } from '@/components/data/forms/ProjectForm'
+import { toast } from 'sonner'
+import { FolderOpen, Plus, MapPin, Wand2, Pencil, Trash2 } from 'lucide-react'
+import type { Project } from '@/types'
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectsApi.list(),
     select: (res) => res.data.results,
   })
+
+  const [editProject, setEditProject] = useState<Project | null>(null)
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => projectsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project deleted')
+    },
+    onError: () => toast.error('Failed to delete project'),
+  })
+
+  const handleDelete = (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation()
+    if (window.confirm(`Delete project "${project.name}" and all its data?`)) {
+      deleteMutation.mutate(project.id)
+    }
+  }
+
+  const handleEdit = (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation()
+    setEditProject(project)
+  }
 
   return (
     <div className="p-6">
@@ -51,17 +80,33 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {projects?.map((project) => (
-          <button
+          <div
             key={project.id}
             onClick={() => navigate(`/projects/${project.id}`)}
-            className="rounded-lg border border-border bg-card p-5 text-left hover:border-primary/50 hover:shadow-md transition-all"
+            className="group rounded-lg border border-border bg-card p-5 text-left hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
           >
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <FolderOpen className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold">{project.name}</h3>
+              <div className="flex items-center gap-2 min-w-0">
+                <FolderOpen className="h-5 w-5 text-primary shrink-0" />
+                <h3 className="font-semibold truncate">{project.name}</h3>
               </div>
-              <StatusBadge status={project.status} />
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={(e) => handleEdit(e, project)}
+                  className="p-1 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Edit project"
+                >
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={(e) => handleDelete(e, project)}
+                  className="p-1 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete project"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <StatusBadge status={project.status} />
+              </div>
             </div>
             {project.description && (
               <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{project.description}</p>
@@ -75,7 +120,7 @@ export function DashboardPage() {
                 <span className="font-mono">{project.supernet}</span>
               )}
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
@@ -85,6 +130,12 @@ export function DashboardPage() {
           <p className="text-lg font-medium">No projects yet</p>
           <p className="text-sm mt-1">Create your first project to start managing IP addresses</p>
         </div>
+      )}
+
+      {editProject && (
+        <Dialog open onOpenChange={() => setEditProject(null)} title="Edit Project">
+          <ProjectForm project={editProject} onClose={() => setEditProject(null)} />
+        </Dialog>
       )}
     </div>
   )
