@@ -109,8 +109,8 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
   })
 
   // Build tree
-  const { tree, projectWideSubnets } = useMemo(() => {
-    if (!sites || !vlans || !subnets || !hosts) return { tree: [] as SiteNode[], projectWideSubnets: [] as SubnetNode[] }
+  const tree = useMemo(() => {
+    if (!sites || !vlans || !subnets || !hosts) return [] as SiteNode[]
 
     const hostsBySubnet = new Map<number, Host[]>()
     for (const h of hosts) {
@@ -121,7 +121,6 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
 
     const subnetsByVlan = new Map<number, SubnetNode[]>()
     const standaloneBySite = new Map<number, SubnetNode[]>()
-    const projectWide: SubnetNode[] = []
 
     for (const s of subnets) {
       const node: SubnetNode = { subnet: s, hosts: hostsBySubnet.get(s.id) ?? [] }
@@ -133,8 +132,6 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
         const arr = standaloneBySite.get(s.site) ?? []
         arr.push(node)
         standaloneBySite.set(s.site, arr)
-      } else {
-        projectWide.push(node)
       }
     }
 
@@ -145,13 +142,11 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
       vlansBySite.set(v.site, arr)
     }
 
-    const treeResult = sites.map((site) => ({
+    return sites.map((site) => ({
       site,
       vlans: vlansBySite.get(site.id) ?? [],
       standaloneSubnets: standaloneBySite.get(site.id) ?? [],
     }))
-
-    return { tree: treeResult, projectWideSubnets: projectWide }
   }, [sites, vlans, subnets, hosts])
 
   // Expand/collapse state
@@ -183,11 +178,8 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
         keys.add(`subnet-${sub.subnet.id}`)
       }
     }
-    for (const sub of projectWideSubnets) {
-      keys.add(`subnet-${sub.subnet.id}`)
-    }
     setExpanded(keys)
-  }, [tree, projectWideSubnets])
+  }, [tree])
 
   const collapseAll = useCallback(() => setExpanded(new Set()), [])
 
@@ -364,27 +356,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                 </TreeFragment>
               )
             })}
-            {/* Project-wide standalone subnets */}
-            {projectWideSubnets.length > 0 && (
-              <TreeFragment>
-                <tr className="border-b border-border bg-muted/30">
-                  <td colSpan={4} className="px-2 md:px-3 py-2">
-                    <span className="flex items-center gap-1.5 font-medium text-sm">
-                      <Network className="h-3.5 w-3.5 text-gray-500" />
-                      Project-Wide Subnets
-                      <span className="text-xs font-normal text-muted-foreground ml-1">
-                        ({projectWideSubnets.length})
-                      </span>
-                    </span>
-                  </td>
-                </tr>
-                {projectWideSubnets.map((subnetNode) => (
-                  <SubnetRow key={`subnet-${subnetNode.subnet.id}`} subnetNode={subnetNode} expanded={expanded} toggle={toggle} setDialog={setDialog} deleteSubnet={deleteSubnet} deleteHost={deleteHost} indent="site" />
-                ))}
-              </TreeFragment>
-            )}
-
-            {tree.length === 0 && projectWideSubnets.length === 0 && (
+            {tree.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-12">
                   <div className="flex flex-col items-center gap-4">

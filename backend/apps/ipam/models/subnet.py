@@ -10,7 +10,6 @@ class Subnet(models.Model):
     )
     site = models.ForeignKey(
         "projects.Site", on_delete=models.CASCADE, related_name="subnets",
-        null=True, blank=True,
     )
     vlan = models.ForeignKey(
         VLAN, on_delete=models.CASCADE, related_name="subnets",
@@ -31,9 +30,7 @@ class Subnet(models.Model):
     def __str__(self):
         if self.vlan:
             return f"{self.network} ({self.vlan})"
-        if self.site:
-            return f"{self.network} ({self.site.name})"
-        return f"{self.network} ({self.project.name})"
+        return f"{self.network} ({self.site.name})"
 
     def save(self, **kwargs):
         if self.vlan_id:

@@ -135,7 +135,7 @@ async function apiFetch(page, url, options = {}) {
     // ═══════════════════════════════════════════════════════════
     // SCENARIO 3: Table view — standalone subnets
     // ═══════════════════════════════════════════════════════════
-    log('Scenario 3: Table view — standalone and project-wide subnets');
+    log('Scenario 3: Table view — standalone subnets');
 
     // Go to table view
     await page.goto(`${BASE}/projects/1/table/network`);
@@ -160,18 +160,6 @@ async function apiFetch(page, url, options = {}) {
       pass('OOB subnet (10.0.250.0/24) in table');
     } else {
       fail('10.0.250.0/24 not in table');
-    }
-
-    if (tableText.includes('Project-Wide')) {
-      pass('Project-Wide section in table');
-    } else {
-      fail('Project-Wide section not in table');
-    }
-
-    if (tableText.includes('10.0.200.0/24')) {
-      pass('Road Warrior subnet (10.0.200.0/24) in table');
-    } else {
-      fail('10.0.200.0/24 not in table');
     }
 
     // Check VLAN subnets still present
@@ -304,11 +292,11 @@ async function apiFetch(page, url, options = {}) {
     // ═══════════════════════════════════════════════════════════
     log('Scenario 6: Overlap checking');
 
-    // Try to create overlapping subnet
+    // Try to create overlapping subnet (under HQ site, standalone)
     const overlapResult = await apiFetch(page, '/api/v1/subnets/', {
       method: 'POST',
       body: JSON.stringify({
-        project: 1, site: null, vlan: null,
+        project: 1, site: 1, vlan: null,
         network: '10.0.10.0/24',  // overlaps with HQ Management
         description: 'overlap test',
       }),
@@ -329,11 +317,11 @@ async function apiFetch(page, url, options = {}) {
       }
     }
 
-    // Non-overlapping should succeed
+    // Non-overlapping should succeed (under HQ site, standalone)
     const noOverlap = await apiFetch(page, '/api/v1/subnets/', {
       method: 'POST',
       body: JSON.stringify({
-        project: 1, site: null, vlan: null,
+        project: 1, site: 1, vlan: null,
         network: '10.99.0.0/24', gateway: '10.99.0.1',
         description: 'no-overlap test',
       }),
@@ -417,7 +405,9 @@ async function apiFetch(page, url, options = {}) {
       const subnet = searchResult.data.results.find(r => r.type === 'subnet');
       if (subnet) {
         pass(`Search found standalone subnet: "${subnet.label}" breadcrumb: "${subnet.breadcrumb}"`);
-        if (!subnet.breadcrumb.includes('VLAN')) {
+        if (!subnet.breadcrumb.includes('VLAN') && subnet.breadcrumb.includes('>')) {
+          pass('Breadcrumb has site but omits VLAN for standalone');
+        } else if (!subnet.breadcrumb.includes('VLAN')) {
           pass('Breadcrumb correctly omits VLAN for standalone');
         } else {
           fail('Breadcrumb incorrectly includes VLAN');

@@ -69,11 +69,6 @@ export function SubnetForm({ vlanId, siteId, projectId, subnet, onClose }: Subne
         payload.site = siteId
         payload.project = projectId
         payload.vlan = null
-      } else if (projectId && !siteId) {
-        // Project-wide standalone
-        payload.project = projectId
-        payload.site = null
-        payload.vlan = null
       } else if (data.vlan) {
         // VLAN chosen from selector
         payload.vlan = parseInt(data.vlan, 10)

@@ -37,7 +37,7 @@ class ProjectExcelView(APIView):
         ws3 = wb.create_sheet("Subnets")
         ws3.append(["Site", "VLAN", "Network", "Gateway", "Description"])
         for subnet in Subnet.objects.filter(project=project).select_related("site", "vlan"):
-            site_name = subnet.site.name if subnet.site else ""
+            site_name = subnet.site.name
             vlan_label = f"VLAN {subnet.vlan.vlan_id}" if subnet.vlan else "(standalone)"
             ws3.append([
                 site_name, vlan_label,
@@ -50,7 +50,7 @@ class ProjectExcelView(APIView):
         for host in Host.objects.filter(
             subnet__project=project
         ).select_related("subnet__site", "subnet__vlan"):
-            site_name = host.subnet.site.name if host.subnet.site else ""
+            site_name = host.subnet.site.name
             vlan_label = f"VLAN {host.subnet.vlan.vlan_id}" if host.subnet.vlan else "(standalone)"
             ws4.append([
                 site_name,
@@ -129,17 +129,6 @@ class ProjectPDFView(APIView):
                     for host in subnet.hosts.all():
                         html += f"<tr><td>{host.ip_address}</td><td>{host.hostname}</td><td>{host.device_type}</td></tr>"
                     html += "</table>"
-
-        # Project-wide standalone subnets
-        project_wide = Subnet.objects.filter(project=project, site__isnull=True, vlan__isnull=True).prefetch_related("hosts")
-        if project_wide.exists():
-            html += "<h2>Project-Wide Subnets</h2>"
-            for subnet in project_wide:
-                html += f"<h4>{subnet.network}</h4><p>{subnet.description}</p>"
-                html += "<table><tr><th>IP</th><th>Hostname</th><th>Type</th></tr>"
-                for host in subnet.hosts.all():
-                    html += f"<tr><td>{host.ip_address}</td><td>{host.hostname}</td><td>{host.device_type}</td></tr>"
-                html += "</table>"
 
         html += "</body></html>"
 

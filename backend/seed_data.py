@@ -120,9 +120,10 @@ s_hq_oob = Subnet.objects.create(
 Host.objects.create(subnet=s_hq_oob, ip_address="10.0.250.10", hostname="hq-ipmi01", device_type="server", description="IPMI BMC serwer 1")
 Host.objects.create(subnet=s_hq_oob, ip_address="10.0.250.11", hostname="hq-ipmi02", device_type="server", description="IPMI BMC serwer 2")
 
-# Project-wide standalone (road warrior VPN pool)
+# Standalone subnet at HQ (road warrior VPN pool)
 s_roadwarrior = Subnet.objects.create(
     project=p1,
+    site=hq,
     network="10.0.200.0/24", gateway="10.0.200.1",
     description="WireGuard Road Warrior Pool",
 )

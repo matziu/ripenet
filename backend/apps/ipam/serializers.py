@@ -36,6 +36,10 @@ class SubnetSerializer(serializers.ModelSerializer):
         queryset=Project.objects.all(),
         required=False,
     )
+    site = serializers.PrimaryKeyRelatedField(
+        queryset=Site.objects.all(),
+        required=False,
+    )
 
     class Meta:
         model = Subnet
@@ -58,13 +62,17 @@ class SubnetSerializer(serializers.ModelSerializer):
             site = vlan.site
             project = vlan.site.project
         else:
-            # Without vlan, project is required
+            # Without vlan, project and site are required
             if not project:
                 raise serializers.ValidationError(
                     {"project": "Project is required when no VLAN is specified."}
                 )
+            if not site:
+                raise serializers.ValidationError(
+                    {"site": "Site is required when no VLAN is specified."}
+                )
             # Validate site belongs to project
-            if site and site.project_id != project.id:
+            if site.project_id != project.id:
                 raise serializers.ValidationError(
                     {"site": "Site does not belong to the specified project."}
                 )

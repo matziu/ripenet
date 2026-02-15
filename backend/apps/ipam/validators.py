@@ -18,10 +18,8 @@ def check_subnet_overlap(network, project, exclude_pk=None):
         if net.overlaps(existing_net):
             if subnet.vlan:
                 location = f"{subnet.site.name} / {subnet.vlan.name}"
-            elif subnet.site:
-                location = f"{subnet.site.name} (standalone)"
             else:
-                location = "project-wide"
+                location = f"{subnet.site.name} (standalone)"
             raise ValidationError(
                 f"Subnet {network} overlaps with existing subnet {subnet.network} "
                 f"in {location}"
@@ -40,7 +38,7 @@ def check_ip_duplicate_in_project(ip_address, project, exclude_pk=None):
 
     if hosts_qs.exists():
         host = hosts_qs.first()
-        location = host.subnet.site.name if host.subnet.site else "project-wide"
+        location = host.subnet.site.name
         raise ValidationError(
             f"IP {ip_address} is already assigned to host {host.hostname or host.ip_address} "
             f"in {location}"
