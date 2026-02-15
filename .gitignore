@@ -45,6 +45,10 @@ test-browse.mjs
 test-wizard.mjs
 test-e2e-standalone.mjs
 
+# Test artifacts
+frontend/test-screenshots/
+frontend/test-results/
+
 # Root-level Playwright deps
 /package.json
 /package-lock.json
