@@ -105,7 +105,7 @@ export function GeoMap({ projectId }: GeoMapProps) {
         const sB = siteMap.get(tunnel.site_b)
         if (!sA?.latitude || !sA?.longitude || !sB?.latitude || !sB?.longitude) return null
 
-        const color = tunnel.status === 'active' ? '#22c55e' : tunnel.status === 'down' ? '#ef4444' : '#3b82f6'
+        const color = tunnel.enabled ? '#22c55e' : '#94a3b8'
 
         return (
           <Polyline
@@ -116,7 +116,8 @@ export function GeoMap({ projectId }: GeoMapProps) {
             ]}
             color={color}
             weight={2}
-            dashArray={tunnel.status === 'planned' ? '8 4' : undefined}
+            opacity={tunnel.enabled ? 1 : 0.4}
+            dashArray="8 4"
           />
         )
       })}

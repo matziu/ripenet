@@ -13,7 +13,6 @@ import { VlanForm } from '@/components/data/forms/VlanForm'
 import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
-import { StatusBadge } from '@/components/shared/StatusBadge'
 import { toast } from 'sonner'
 import type { Host } from '@/types'
 import {
@@ -337,7 +336,14 @@ function TunnelDetail({ tunnelId, projectId }: { tunnelId: number; projectId: nu
       </div>
 
       <div className="flex items-center gap-2">
-        <StatusBadge status={tunnel.status} />
+        <span className={cn(
+          'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
+          tunnel.enabled
+            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+            : 'bg-muted text-muted-foreground'
+        )}>
+          {tunnel.enabled ? 'Enabled' : 'Disabled'}
+        </span>
         <span className="text-xs uppercase text-muted-foreground">{tunnel.tunnel_type}</span>
       </div>
 

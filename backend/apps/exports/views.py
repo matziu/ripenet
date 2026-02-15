@@ -64,13 +64,13 @@ class ProjectExcelView(APIView):
 
         # Tunnels sheet
         ws5 = wb.create_sheet("Tunnels")
-        ws5.append(["Name", "Type", "Subnet", "Site A", "IP A", "Site B", "IP B", "Status"])
+        ws5.append(["Name", "Type", "Subnet", "Site A", "IP A", "Site B", "IP B", "Enabled"])
         for tunnel in Tunnel.objects.filter(project=project).select_related("site_a", "site_b"):
             ws5.append([
                 tunnel.name, tunnel.tunnel_type, str(tunnel.tunnel_subnet),
                 tunnel.site_a.name, str(tunnel.ip_a),
                 tunnel.site_b.name, str(tunnel.ip_b),
-                tunnel.status,
+                "Yes" if tunnel.enabled else "No",
             ])
 
         buffer = io.BytesIO()

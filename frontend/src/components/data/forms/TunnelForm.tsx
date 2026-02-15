@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { tunnelsApi, sitesApi } from '@/api/endpoints'
 import { toast } from 'sonner'
-import type { Tunnel, TunnelType, TunnelStatus } from '@/types'
+import type { Tunnel, TunnelType } from '@/types'
 
 interface TunnelFormProps {
   projectId: number
@@ -18,7 +18,7 @@ interface FormValues {
   ip_a: string
   site_b: string
   ip_b: string
-  status: TunnelStatus
+  enabled: boolean
   description: string
 }
 
@@ -40,11 +40,11 @@ export function TunnelForm({ projectId, tunnel, onClose }: TunnelFormProps) {
       ip_a: tunnel.ip_a,
       site_b: String(tunnel.site_b),
       ip_b: tunnel.ip_b,
-      status: tunnel.status,
+      enabled: tunnel.enabled,
       description: tunnel.description,
     } : {
       tunnel_type: 'gre',
-      status: 'planned',
+      enabled: true,
     },
   })
 
@@ -58,7 +58,7 @@ export function TunnelForm({ projectId, tunnel, onClose }: TunnelFormProps) {
         ip_a: data.ip_a,
         site_b: parseInt(data.site_b, 10),
         ip_b: data.ip_b,
-        status: data.status,
+        enabled: data.enabled,
         description: data.description,
         project: projectId,
       }
@@ -105,16 +105,14 @@ export function TunnelForm({ projectId, tunnel, onClose }: TunnelFormProps) {
             <option value="wireguard">WireGuard</option>
           </select>
         </div>
-        <div>
-          <label className="text-xs font-medium">Status</label>
-          <select
-            {...register('status')}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-          >
-            <option value="planned">Planned</option>
-            <option value="active">Active</option>
-            <option value="down">Down</option>
-          </select>
+        <div className="flex items-center gap-2 self-end pb-1.5">
+          <input
+            type="checkbox"
+            {...register('enabled')}
+            id="tunnel-enabled"
+            className="h-4 w-4 rounded border-input"
+          />
+          <label htmlFor="tunnel-enabled" className="text-xs font-medium">Enabled</label>
         </div>
       </div>
 

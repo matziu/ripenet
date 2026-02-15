@@ -11,11 +11,6 @@ class Tunnel(models.Model):
         VXLAN = "vxlan", "VXLAN"
         WIREGUARD = "wireguard", "WireGuard"
 
-    class Status(models.TextChoices):
-        PLANNED = "planned", "Planned"
-        ACTIVE = "active", "Active"
-        DOWN = "down", "Down"
-
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="tunnels")
     name = models.CharField(max_length=200)
     tunnel_type = models.CharField(max_length=20, choices=TunnelType.choices)
@@ -24,7 +19,7 @@ class Tunnel(models.Model):
     ip_a = InetAddressField(help_text="Tunnel IP for site A")
     site_b = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="tunnels_as_b")
     ip_b = InetAddressField(help_text="Tunnel IP for site B")
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLANNED)
+    enabled = models.BooleanField(default=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -35,7 +35,7 @@ class TunnelFilter(django_filters.FilterSet):
 
     class Meta:
         model = Tunnel
-        fields = ["project", "tunnel_type", "status"]
+        fields = ["project", "tunnel_type", "enabled"]
 
 
 class HostFilter(django_filters.FilterSet):

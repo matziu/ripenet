@@ -11,10 +11,10 @@ const tunnelTypeColors: Record<string, string> = {
   vxlan: '#06b6d4',
 }
 
-const statusStyles: Record<string, { dasharray?: string; opacity: number; animate: boolean }> = {
-  active: { dasharray: '8 4', opacity: 1, animate: true },
-  planned: { dasharray: '8 4', opacity: 0.5, animate: false },
-  down: { dasharray: '4 4', opacity: 0.4, animate: false },
+function getEnabledStyle(enabled: boolean): { dasharray?: string; opacity: number; animate: boolean } {
+  return enabled
+    ? { dasharray: '8 4', opacity: 1, animate: true }
+    : { dasharray: '8 4', opacity: 0.35, animate: false }
 }
 
 const PERPENDICULAR_OFFSET = 18
@@ -56,8 +56,9 @@ export function TunnelEdge({ sourceX, sourceY, targetX, targetY, sourcePosition,
     sourcePosition, targetPosition,
   })
 
-  const color = tunnelTypeColors[d.tunnelType] ?? '#94a3b8'
-  const status = statusStyles[d.status] ?? statusStyles.active
+  const baseColor = tunnelTypeColors[d.tunnelType] ?? '#94a3b8'
+  const color = d.enabled ? baseColor : '#94a3b8'
+  const status = getEnabledStyle(d.enabled)
 
   // offsetSide from layout: +1 or -1, pushes labels away from graph centroid
   const side = (d.offsetSide as number) ?? 1
@@ -142,8 +143,8 @@ export function TunnelEdge({ sourceX, sourceY, targetX, targetY, sourcePosition,
         >
           <span>{d.label}</span>
           <span className="ml-1.5 text-muted-foreground uppercase text-[9px]">{d.tunnelType}</span>
-          {d.status === 'down' && (
-            <span className="ml-1.5 text-red-500 text-[9px] font-semibold">DOWN</span>
+          {!d.enabled && (
+            <span className="ml-1.5 text-muted-foreground text-[9px] font-semibold">OFF</span>
           )}
         </div>
 

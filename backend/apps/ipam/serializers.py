@@ -109,7 +109,7 @@ class TunnelSerializer(serializers.ModelSerializer):
             "id", "project", "name", "tunnel_type", "tunnel_subnet",
             "site_a", "site_a_name", "ip_a",
             "site_b", "site_b_name", "ip_b",
-            "status", "description", "created_at", "updated_at",
+            "enabled", "description", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -162,7 +162,7 @@ class TunnelTopologySerializer(serializers.ModelSerializer):
             "id", "name", "tunnel_type", "tunnel_subnet",
             "site_a", "site_a_name", "ip_a",
             "site_b", "site_b_name", "ip_b",
-            "status",
+            "enabled",
         ]
 
 

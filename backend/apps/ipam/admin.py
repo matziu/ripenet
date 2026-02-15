@@ -38,6 +38,6 @@ class HostAdmin(admin.ModelAdmin):
 
 @admin.register(Tunnel)
 class TunnelAdmin(admin.ModelAdmin):
-    list_display = ("name", "tunnel_type", "tunnel_subnet", "site_a", "site_b", "status")
-    list_filter = ("tunnel_type", "status", "project")
+    list_display = ("name", "tunnel_type", "tunnel_subnet", "site_a", "site_b", "enabled")
+    list_filter = ("tunnel_type", "enabled", "project")
     search_fields = ("name",)

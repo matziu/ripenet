@@ -81,7 +81,6 @@ export interface Host {
 }
 
 export type TunnelType = 'gre' | 'ipsec' | 'vxlan' | 'wireguard'
-export type TunnelStatus = 'planned' | 'active' | 'down'
 
 export interface Tunnel {
   id: number
@@ -95,7 +94,7 @@ export interface Tunnel {
   site_b: number
   site_b_name: string
   ip_b: string
-  status: TunnelStatus
+  enabled: boolean
   description: string
   created_at: string
   updated_at: string
@@ -147,7 +146,7 @@ export interface TunnelTopology {
   site_b: number
   site_b_name: string
   ip_b: string
-  status: TunnelStatus
+  enabled: boolean
 }
 
 export interface ProjectTopology {

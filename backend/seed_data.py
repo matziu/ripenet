@@ -133,19 +133,19 @@ Host.objects.create(subnet=s_roadwarrior, ip_address="10.0.200.11", hostname="rw
 Tunnel.objects.create(
     project=p1, name="HQ-DC GRE", tunnel_type="gre",
     site_a=hq, ip_a="172.16.0.1", site_b=dc, ip_b="172.16.0.2",
-    tunnel_subnet="172.16.0.0/30", status="active",
+    tunnel_subnet="172.16.0.0/30", enabled=True,
     description="Tunel GRE między HQ a DC",
 )
 Tunnel.objects.create(
     project=p1, name="HQ-Branch IPsec", tunnel_type="ipsec",
     site_a=hq, ip_a="172.16.1.1", site_b=br, ip_b="172.16.1.2",
-    tunnel_subnet="172.16.1.0/30", status="active",
+    tunnel_subnet="172.16.1.0/30", enabled=True,
     description="Tunel IPsec między HQ a Branch",
 )
 Tunnel.objects.create(
     project=p1, name="DC-Branch WireGuard", tunnel_type="wireguard",
     site_a=dc, ip_a="172.16.2.1", site_b=br, ip_b="172.16.2.2",
-    tunnel_subnet="172.16.2.0/30", status="planned",
+    tunnel_subnet="172.16.2.0/30", enabled=False,
     description="Planowany WireGuard DC-Branch",
 )
 
@@ -177,7 +177,7 @@ Host.objects.create(subnet=s_co_usr, ip_address="10.10.120.10", hostname="co-pc0
 Tunnel.objects.create(
     project=p2, name="Centrum-Mokotów VPN", tunnel_type="wireguard",
     site_a=waw_main, ip_a="172.17.0.1", site_b=waw_co, ip_b="172.17.0.2",
-    tunnel_subnet="172.17.0.0/30", status="planned",
+    tunnel_subnet="172.17.0.0/30", enabled=False,
     description="Planowany WireGuard między biurami",
 )
 

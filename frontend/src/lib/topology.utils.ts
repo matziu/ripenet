@@ -84,7 +84,7 @@ export interface SiteNodeData {
 export interface TunnelEdgeData {
   label: string
   tunnelType: string
-  status: string
+  enabled: boolean
   ipA: string
   ipB: string
   offsetSide: number
@@ -455,7 +455,7 @@ export function topologyToFlow(
       data: {
         label: tunnel.tunnel_subnet,
         tunnelType: tunnel.tunnel_type,
-        status: tunnel.status,
+        enabled: tunnel.enabled,
         ipA: tunnel.ip_a,
         ipB: tunnel.ip_b,
         offsetSide: 1,

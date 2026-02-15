@@ -638,8 +638,8 @@ function TunnelTreeItem({ tunnel, projectId }: { tunnel: Tunnel; projectId: numb
             isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
           )}
         >
-          <Cable className="h-3 w-3 shrink-0" />
-          <span className="truncate">{tunnel.name}</span>
+          <Cable className={cn("h-3 w-3 shrink-0", !tunnel.enabled && "opacity-40")} />
+          <span className={cn("truncate", !tunnel.enabled && "opacity-50")}>{tunnel.name}</span>
           <span className="ml-auto text-[10px] text-muted-foreground uppercase shrink-0">{tunnel.tunnel_type}</span>
         </button>
         <DropdownMenu items={[

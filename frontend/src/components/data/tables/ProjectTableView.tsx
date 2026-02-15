@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
-import { StatusBadge } from '@/components/shared/StatusBadge'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { Dialog } from '@/components/ui/Dialog'
 import { SiteForm } from '@/components/data/forms/SiteForm'
@@ -370,7 +369,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
               </tr>
             )}
             {tunnels?.map((tunnel) => (
-              <tr key={`tunnel-${tunnel.id}`} className="border-b border-border hover:bg-accent/20">
+              <tr key={`tunnel-${tunnel.id}`} className={cn("border-b border-border hover:bg-accent/20", !tunnel.enabled && "opacity-50")}>
                 <td className="px-2 md:px-3 py-1.5 pl-6 md:pl-8">
                   <span className="flex items-center gap-1.5 text-sm font-medium">
                     <Cable className="h-3.5 w-3.5 text-purple-500" />
@@ -384,7 +383,14 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                   {tunnel.site_a_name} (<CopyableIP ip={tunnel.ip_a} />) → {tunnel.site_b_name} (<CopyableIP ip={tunnel.ip_b} />)
                 </td>
                 <td className="px-2 md:px-3 py-1.5 hidden md:table-cell">
-                  <StatusBadge status={tunnel.status} />
+                  <span className={cn(
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    tunnel.enabled
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-muted text-muted-foreground'
+                  )}>
+                    {tunnel.enabled ? 'Enabled' : 'Disabled'}
+                  </span>
                 </td>
                 <td className="px-2 md:px-3 py-1.5">
                   <div className="flex justify-end gap-0.5">
