@@ -38,3 +38,16 @@ Thumbs.db
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Test/debug scripts
+show-dbg.mjs
+test-browse.mjs
+test-wizard.mjs
+test-e2e-standalone.mjs
+
+# Root-level Playwright deps
+/package.json
+/package-lock.json
+
+# Auto-generated
+frontend/README.md
