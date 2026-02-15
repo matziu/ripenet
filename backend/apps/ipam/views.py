@@ -34,7 +34,7 @@ class SubnetViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Subnet.objects.annotate(
             host_count=Count("hosts", distinct=True),
-        ).select_related("vlan", "vlan__site", "vlan__site__project")
+        ).select_related("project", "site", "vlan", "vlan__site")
 
     @action(detail=True, methods=["get"], url_path="next-free-ip")
     def next_free_ip(self, request, pk=None):
@@ -46,7 +46,7 @@ class SubnetViewSet(viewsets.ModelViewSet):
             str(h.ip_address) for h in subnet_obj.hosts.all()
         )
         # Also check tunnel IPs in the same project
-        project = subnet_obj.vlan.site.project
+        project = subnet_obj.project
         tunnels = Tunnel.objects.filter(project=project)
         for t in tunnels:
             used_ips.add(str(t.ip_a))
@@ -72,7 +72,7 @@ class HostViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Host.objects.select_related(
-            "subnet", "subnet__vlan", "subnet__vlan__site", "subnet__vlan__site__project"
+            "subnet", "subnet__project", "subnet__site", "subnet__vlan"
         )
 
 

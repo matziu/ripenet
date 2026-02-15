@@ -39,4 +39,4 @@ class Host(models.Model):
 
     @property
     def project(self):
-        return self.subnet.vlan.site.project
+        return self.subnet.project

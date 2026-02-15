@@ -110,6 +110,25 @@ Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.11", hostname="br-cam02
 Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.12", hostname="br-cam03", device_type="camera", description="Hikvision DS-2CD2143 — magazyn")
 Host.objects.create(subnet=s_br_cam, ip_address="10.2.50.100", hostname="br-nvr01", device_type="server", description="NVR Hikvision DS-7616")
 
+# === Standalone Subnets ===
+# Site-level standalone (management without VLAN)
+s_hq_oob = Subnet.objects.create(
+    project=p1, site=hq,
+    network="10.0.250.0/24", gateway="10.0.250.1",
+    description="Out-of-Band Management HQ (standalone)",
+)
+Host.objects.create(subnet=s_hq_oob, ip_address="10.0.250.10", hostname="hq-ipmi01", device_type="server", description="IPMI BMC serwer 1")
+Host.objects.create(subnet=s_hq_oob, ip_address="10.0.250.11", hostname="hq-ipmi02", device_type="server", description="IPMI BMC serwer 2")
+
+# Project-wide standalone (road warrior VPN pool)
+s_roadwarrior = Subnet.objects.create(
+    project=p1,
+    network="10.0.200.0/24", gateway="10.0.200.1",
+    description="WireGuard Road Warrior Pool",
+)
+Host.objects.create(subnet=s_roadwarrior, ip_address="10.0.200.10", hostname="rw-laptop-kowalski", device_type="workstation", description="Laptop VPN Kowalski")
+Host.objects.create(subnet=s_roadwarrior, ip_address="10.0.200.11", hostname="rw-laptop-nowak", device_type="workstation", description="Laptop VPN Nowak")
+
 # === Tunnels ===
 Tunnel.objects.create(
     project=p1, name="HQ-DC GRE", tunnel_type="gre",

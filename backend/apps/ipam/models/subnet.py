@@ -5,7 +5,17 @@ from .vlan import VLAN
 
 
 class Subnet(models.Model):
-    vlan = models.ForeignKey(VLAN, on_delete=models.CASCADE, related_name="subnets")
+    project = models.ForeignKey(
+        "projects.Project", on_delete=models.CASCADE, related_name="subnets",
+    )
+    site = models.ForeignKey(
+        "projects.Site", on_delete=models.CASCADE, related_name="subnets",
+        null=True, blank=True,
+    )
+    vlan = models.ForeignKey(
+        VLAN, on_delete=models.CASCADE, related_name="subnets",
+        null=True, blank=True,
+    )
     network = CidrAddressField(help_text="Network in CIDR notation, e.g. 10.0.1.0/24")
     gateway = InetAddressField(blank=True, null=True, help_text="Gateway IP address")
     description = models.TextField(blank=True)
@@ -19,8 +29,16 @@ class Subnet(models.Model):
         ordering = ["network"]
 
     def __str__(self):
-        return f"{self.network} ({self.vlan})"
+        if self.vlan:
+            return f"{self.network} ({self.vlan})"
+        if self.site:
+            return f"{self.network} ({self.site.name})"
+        return f"{self.network} ({self.project.name})"
 
-    @property
-    def project(self):
-        return self.vlan.site.project
+    def save(self, **kwargs):
+        if self.vlan_id:
+            if not self.site_id:
+                self.site_id = self.vlan.site_id
+            if not self.project_id:
+                self.project_id = self.vlan.site.project_id
+        super().save(**kwargs)

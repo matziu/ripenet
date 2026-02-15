@@ -23,8 +23,8 @@ class VLANAdmin(admin.ModelAdmin):
 
 @admin.register(Subnet)
 class SubnetAdmin(admin.ModelAdmin):
-    list_display = ("network", "gateway", "vlan", "description")
-    list_filter = ("vlan__site__project",)
+    list_display = ("network", "gateway", "vlan", "project", "site", "description")
+    list_filter = ("project",)
     search_fields = ("description",)
     inlines = [HostInline]
 
@@ -32,7 +32,7 @@ class SubnetAdmin(admin.ModelAdmin):
 @admin.register(Host)
 class HostAdmin(admin.ModelAdmin):
     list_display = ("ip_address", "hostname", "device_type", "subnet")
-    list_filter = ("device_type", "subnet__vlan__site__project")
+    list_filter = ("device_type", "subnet__project")
     search_fields = ("hostname", "description")
 
 

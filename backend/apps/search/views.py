@@ -21,44 +21,46 @@ class GlobalSearchView(APIView):
         hosts = Host.objects.filter(
             Q(hostname__icontains=q) | Q(ip_address__startswith=q) | Q(description__icontains=q)
         ).select_related(
-            "subnet__vlan__site__project"
+            "subnet__project", "subnet__site", "subnet__vlan"
         )[:10]
 
         for host in hosts:
+            parts = [host.subnet.project.name]
+            if host.subnet.site:
+                parts.append(host.subnet.site.name)
+            if host.subnet.vlan:
+                parts.append(f"VLAN {host.subnet.vlan.vlan_id}")
             results.append({
                 "type": "host",
                 "id": host.id,
                 "label": str(host.ip_address),
                 "secondary": host.hostname,
-                "breadcrumb": (
-                    f"{host.subnet.vlan.site.project.name} > "
-                    f"{host.subnet.vlan.site.name} > "
-                    f"VLAN {host.subnet.vlan.vlan_id}"
-                ),
-                "project_id": host.subnet.vlan.site.project_id,
-                "site_id": host.subnet.vlan.site_id,
-                "vlan_id": host.subnet.vlan_id,
+                "breadcrumb": " > ".join(parts),
+                "project_id": host.subnet.project_id,
+                "site_id": host.subnet.site_id,
+                "vlan_id": host.subnet.vlan_id if host.subnet.vlan else None,
                 "subnet_id": host.subnet_id,
             })
 
         # Search subnets
         subnets = Subnet.objects.filter(
             Q(description__icontains=q) | Q(network__startswith=q)
-        ).select_related("vlan__site__project")[:10]
+        ).select_related("project", "site", "vlan")[:10]
 
         for subnet in subnets:
+            parts = [subnet.project.name]
+            if subnet.site:
+                parts.append(subnet.site.name)
+            if subnet.vlan:
+                parts.append(f"VLAN {subnet.vlan.vlan_id}")
             results.append({
                 "type": "subnet",
                 "id": subnet.id,
                 "label": str(subnet.network),
                 "secondary": subnet.description,
-                "breadcrumb": (
-                    f"{subnet.vlan.site.project.name} > "
-                    f"{subnet.vlan.site.name} > "
-                    f"VLAN {subnet.vlan.vlan_id}"
-                ),
-                "project_id": subnet.vlan.site.project_id,
-                "site_id": subnet.vlan.site_id,
+                "breadcrumb": " > ".join(parts),
+                "project_id": subnet.project_id,
+                "site_id": subnet.site_id,
                 "vlan_id": subnet.vlan_id,
             })
 

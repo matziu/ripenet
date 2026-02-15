@@ -36,26 +36,29 @@ class ProjectExcelView(APIView):
         # Subnets sheet
         ws3 = wb.create_sheet("Subnets")
         ws3.append(["Site", "VLAN", "Network", "Gateway", "Description"])
-        for subnet in Subnet.objects.filter(vlan__site__project=project).select_related("vlan__site"):
+        for subnet in Subnet.objects.filter(project=project).select_related("site", "vlan"):
+            site_name = subnet.site.name if subnet.site else ""
+            vlan_label = f"VLAN {subnet.vlan.vlan_id}" if subnet.vlan else "(standalone)"
             ws3.append([
-                subnet.vlan.site.name, f"VLAN {subnet.vlan.vlan_id}",
+                site_name, vlan_label,
                 str(subnet.network), str(subnet.gateway or ""), subnet.description,
             ])
 
         # Hosts sheet
         ws4 = wb.create_sheet("Hosts")
-        ws4.append(["Site", "VLAN", "Subnet", "IP", "Hostname", "MAC", "Status", "Device Type"])
+        ws4.append(["Site", "VLAN", "Subnet", "IP", "Hostname", "MAC", "Device Type"])
         for host in Host.objects.filter(
-            subnet__vlan__site__project=project
-        ).select_related("subnet__vlan__site"):
+            subnet__project=project
+        ).select_related("subnet__site", "subnet__vlan"):
+            site_name = host.subnet.site.name if host.subnet.site else ""
+            vlan_label = f"VLAN {host.subnet.vlan.vlan_id}" if host.subnet.vlan else "(standalone)"
             ws4.append([
-                host.subnet.vlan.site.name,
-                f"VLAN {host.subnet.vlan.vlan_id}",
+                site_name,
+                vlan_label,
                 str(host.subnet.network),
                 str(host.ip_address),
                 host.hostname,
                 host.mac_address,
-                host.status,
                 host.device_type,
             ])
 
@@ -111,10 +114,32 @@ class ProjectPDFView(APIView):
                 html += f"<h3>VLAN {vlan.vlan_id} - {vlan.name}</h3>"
                 for subnet in vlan.subnets.all():
                     html += f"<h4>{subnet.network}</h4>"
-                    html += "<table><tr><th>IP</th><th>Hostname</th><th>Status</th><th>Type</th></tr>"
+                    html += "<table><tr><th>IP</th><th>Hostname</th><th>Type</th></tr>"
                     for host in subnet.hosts.all():
-                        html += f"<tr><td>{host.ip_address}</td><td>{host.hostname}</td><td>{host.status}</td><td>{host.device_type}</td></tr>"
+                        html += f"<tr><td>{host.ip_address}</td><td>{host.hostname}</td><td>{host.device_type}</td></tr>"
                     html += "</table>"
+
+            # Standalone subnets for this site
+            standalone = Subnet.objects.filter(site=site, vlan__isnull=True).prefetch_related("hosts")
+            if standalone.exists():
+                html += "<h3>Standalone Subnets</h3>"
+                for subnet in standalone:
+                    html += f"<h4>{subnet.network}</h4>"
+                    html += "<table><tr><th>IP</th><th>Hostname</th><th>Type</th></tr>"
+                    for host in subnet.hosts.all():
+                        html += f"<tr><td>{host.ip_address}</td><td>{host.hostname}</td><td>{host.device_type}</td></tr>"
+                    html += "</table>"
+
+        # Project-wide standalone subnets
+        project_wide = Subnet.objects.filter(project=project, site__isnull=True, vlan__isnull=True).prefetch_related("hosts")
+        if project_wide.exists():
+            html += "<h2>Project-Wide Subnets</h2>"
+            for subnet in project_wide:
+                html += f"<h4>{subnet.network}</h4><p>{subnet.description}</p>"
+                html += "<table><tr><th>IP</th><th>Hostname</th><th>Type</th></tr>"
+                for host in subnet.hosts.all():
+                    html += f"<tr><td>{host.ip_address}</td><td>{host.hostname}</td><td>{host.device_type}</td></tr>"
+                html += "</table>"
 
         html += "</body></html>"
 

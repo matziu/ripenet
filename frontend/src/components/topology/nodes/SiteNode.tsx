@@ -141,12 +141,31 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
         </div>
       )}
 
-      {/* Expanded VLANs */}
-      {d.expanded && d.vlans.length > 0 && (
+      {/* Expanded VLANs + Standalone Subnets */}
+      {d.expanded && (d.vlans.length > 0 || (d.standaloneSubnets?.length ?? 0) > 0) && (
         <div className="px-3 pb-3 space-y-1 border-t border-border/30 pt-2 mt-0.5">
           {d.vlans.map((vlan) => (
             <VlanRow key={vlan.id} vlan={vlan} />
           ))}
+          {d.standaloneSubnets && d.standaloneSubnets.length > 0 && (
+            <>
+              {d.vlans.length > 0 && (
+                <div className="text-[9px] uppercase tracking-wider text-muted-foreground/60 pt-1">
+                  Standalone
+                </div>
+              )}
+              {d.standaloneSubnets.map((sub, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 rounded-md px-2 py-1 bg-gray-500/10 border border-gray-500/20"
+                >
+                  <div className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
+                  <span className="text-[11px] font-mono text-muted-foreground">{sub.network}</span>
+                  <SubnetUtilBar network={sub.network} hostCount={sub.hostCount} className="ml-auto" />
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 

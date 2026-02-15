@@ -216,6 +216,7 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
   const isSelected = selectedSiteId === site.id
 
   const [addVlanOpen, setAddVlanOpen] = useState(false)
+  const [addStandaloneSubnetOpen, setAddStandaloneSubnetOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
 
   const deleteMutation = useMutation({
@@ -230,6 +231,13 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
   const { data: vlansData } = useQuery({
     queryKey: ['vlans', { site: String(site.id) }],
     queryFn: () => vlansApi.list({ site: String(site.id) }),
+    select: (res) => res.data.results,
+    enabled: expanded,
+  })
+
+  const { data: standaloneSubnets } = useQuery({
+    queryKey: ['subnets', { site: String(site.id), standalone: 'true' }],
+    queryFn: () => subnetsApi.list({ site: String(site.id), standalone: 'true' }),
     select: (res) => res.data.results,
     enabled: expanded,
   })
@@ -276,6 +284,7 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
           <Plus className="h-3 w-3" />
         </button>
         <DropdownMenu items={[
+          { label: 'Add Subnet', icon: <Plus className="h-3 w-3" />, onClick: () => setAddStandaloneSubnetOpen(true) },
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
           { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
             if (window.confirm(`Delete site "${site.name}"?`)) deleteMutation.mutate()
@@ -283,16 +292,30 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
         ]} />
       </div>
 
-      {expanded && vlans.length > 0 && (
+      {expanded && (vlans.length > 0 || (standaloneSubnets && standaloneSubnets.length > 0)) && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
           {vlans.map((vlan) => (
             <VlanTreeItem key={vlan.id} vlan={vlan} siteId={site.id} />
           ))}
+          {standaloneSubnets && standaloneSubnets.length > 0 && (
+            <>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1.5 pt-1">
+                Standalone
+              </div>
+              {standaloneSubnets.map((subnet) => (
+                <SubnetTreeItem key={subnet.id} subnet={subnet} />
+              ))}
+            </>
+          )}
         </div>
       )}
 
       <Dialog open={addVlanOpen} onOpenChange={setAddVlanOpen} title="Add VLAN">
         <VlanForm siteId={site.id} onClose={() => setAddVlanOpen(false)} />
+      </Dialog>
+
+      <Dialog open={addStandaloneSubnetOpen} onOpenChange={setAddStandaloneSubnetOpen} title="Add Standalone Subnet">
+        <SubnetForm siteId={site.id} projectId={projectId} onClose={() => setAddStandaloneSubnetOpen(false)} />
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Site">
@@ -404,7 +427,7 @@ function VlanTreeItem({ vlan, siteId }: { vlan: VLAN; siteId: number }) {
 
 // ── Subnet ────────────────────────────────────────────────────
 
-function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) {
+function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number }) {
   const queryClient = useQueryClient()
   const expanded = useSelectionStore((s) => s.expandedSubnetIds.has(subnet.id))
   const toggleExpanded = useSelectionStore((s) => s.toggleExpandedSubnet)
@@ -492,7 +515,13 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId: number }) 
       )}
 
       <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Subnet">
-        <SubnetForm vlanId={vlanId} subnet={subnet} onClose={() => setEditOpen(false)} />
+        <SubnetForm
+          vlanId={vlanId ?? (subnet.vlan ?? undefined)}
+          siteId={subnet.site ?? undefined}
+          projectId={subnet.project}
+          subnet={subnet}
+          onClose={() => setEditOpen(false)}
+        />
       </Dialog>
 
       <Dialog open={addHostOpen} onOpenChange={setAddHostOpen} title="Add Host">

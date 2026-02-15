@@ -24,6 +24,7 @@ import type { Site, VLAN, Subnet, Host, Tunnel } from '@/types'
 interface SiteNode {
   site: Site
   vlans: VlanNode[]
+  standaloneSubnets: SubnetNode[]
 }
 
 interface VlanNode {
@@ -108,8 +109,8 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
   })
 
   // Build tree
-  const tree = useMemo((): SiteNode[] => {
-    if (!sites || !vlans || !subnets || !hosts) return []
+  const { tree, projectWideSubnets } = useMemo(() => {
+    if (!sites || !vlans || !subnets || !hosts) return { tree: [] as SiteNode[], projectWideSubnets: [] as SubnetNode[] }
 
     const hostsBySubnet = new Map<number, Host[]>()
     for (const h of hosts) {
@@ -119,10 +120,22 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
     }
 
     const subnetsByVlan = new Map<number, SubnetNode[]>()
+    const standaloneBySite = new Map<number, SubnetNode[]>()
+    const projectWide: SubnetNode[] = []
+
     for (const s of subnets) {
-      const arr = subnetsByVlan.get(s.vlan) ?? []
-      arr.push({ subnet: s, hosts: hostsBySubnet.get(s.id) ?? [] })
-      subnetsByVlan.set(s.vlan, arr)
+      const node: SubnetNode = { subnet: s, hosts: hostsBySubnet.get(s.id) ?? [] }
+      if (s.vlan) {
+        const arr = subnetsByVlan.get(s.vlan) ?? []
+        arr.push(node)
+        subnetsByVlan.set(s.vlan, arr)
+      } else if (s.site) {
+        const arr = standaloneBySite.get(s.site) ?? []
+        arr.push(node)
+        standaloneBySite.set(s.site, arr)
+      } else {
+        projectWide.push(node)
+      }
     }
 
     const vlansBySite = new Map<number, VlanNode[]>()
@@ -132,10 +145,13 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
       vlansBySite.set(v.site, arr)
     }
 
-    return sites.map((site) => ({
+    const treeResult = sites.map((site) => ({
       site,
       vlans: vlansBySite.get(site.id) ?? [],
+      standaloneSubnets: standaloneBySite.get(site.id) ?? [],
     }))
+
+    return { tree: treeResult, projectWideSubnets: projectWide }
   }, [sites, vlans, subnets, hosts])
 
   // Expand/collapse state
@@ -163,9 +179,15 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
           keys.add(`subnet-${sub.subnet.id}`)
         }
       }
+      for (const sub of sn.standaloneSubnets) {
+        keys.add(`subnet-${sub.subnet.id}`)
+      }
+    }
+    for (const sub of projectWideSubnets) {
+      keys.add(`subnet-${sub.subnet.id}`)
     }
     setExpanded(keys)
-  }, [tree])
+  }, [tree, projectWideSubnets])
 
   const collapseAll = useCallback(() => setExpanded(new Set()), [])
 
@@ -321,82 +343,48 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                         </tr>
 
                         {/* Subnet rows */}
-                        {vlanOpen && vlanNode.subnets.map((subnetNode) => {
-                          const subKey = `subnet-${subnetNode.subnet.id}`
-                          const subOpen = expanded.has(subKey)
-
-                          return (
-                            <TreeFragment key={subKey}>
-                              <tr className="border-b border-border hover:bg-accent/20">
-                                <td className="px-2 md:px-3 py-1.5 pl-10 md:pl-14">
-                                  <button onClick={() => toggle(subKey)} className="flex items-center gap-1.5 text-sm">
-                                    {subOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-                                    <Network className="h-3.5 w-3.5 text-emerald-500" />
-                                    <span className="font-mono text-xs">{subnetNode.subnet.network}</span>
-                                    <SubnetUtilBar network={subnetNode.subnet.network} hostCount={subnetNode.hosts.length} className="ml-2" />
-                                  </button>
-                                </td>
-                                <td className="px-2 md:px-3 py-1.5 text-muted-foreground text-xs hidden sm:table-cell">
-                                  {subnetNode.subnet.gateway ? `gw ${subnetNode.subnet.gateway}` : '-'}
-                                  {subnetNode.subnet.description && ` · ${subnetNode.subnet.description}`}
-                                </td>
-                                <td className="px-2 md:px-3 py-1.5 hidden md:table-cell"></td>
-                                <td className="px-2 md:px-3 py-1.5">
-                                  <div className="flex justify-end gap-0.5">
-                                    <button onClick={() => setDialog({ type: 'host', mode: 'add', parentId: subnetNode.subnet.id })} className="p-1 rounded hover:bg-accent" title="Add host">
-                                      <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </button>
-                                    <button onClick={() => setDialog({ type: 'subnet', mode: 'edit', entity: subnetNode.subnet })} className="p-1 rounded hover:bg-accent" title="Edit subnet">
-                                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </button>
-                                    <button onClick={() => { if (window.confirm(`Delete subnet "${subnetNode.subnet.network}"?`)) deleteSubnet.mutate(subnetNode.subnet.id) }} className="p-1 rounded hover:bg-destructive/20" title="Delete subnet">
-                                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-
-                              {/* Host rows */}
-                              {subOpen && subnetNode.hosts.map((host) => (
-                                <tr key={host.id} className="border-b border-border hover:bg-accent/20">
-                                  <td className="px-2 md:px-3 py-1.5 pl-14 md:pl-20">
-                                    <span className="flex items-center gap-1.5 text-sm">
-                                      <Server className="h-3 w-3 text-orange-500" />
-                                      <CopyableIP ip={host.ip_address} />
-                                      {host.hostname && (
-                                        <span className="text-muted-foreground hidden sm:inline">({host.hostname})</span>
-                                      )}
-                                    </span>
-                                  </td>
-                                  <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
-                                    {host.device_type}
-                                    {host.mac_address && ` · ${host.mac_address}`}
-                                  </td>
-                                  <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden md:table-cell">
-                                    {host.device_type}
-                                  </td>
-                                  <td className="px-2 md:px-3 py-1.5">
-                                    <div className="flex justify-end gap-0.5">
-                                      <button onClick={() => setDialog({ type: 'host', mode: 'edit', entity: host })} className="p-1 rounded hover:bg-accent" title="Edit host">
-                                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                                      </button>
-                                      <button onClick={() => { if (window.confirm(`Delete host "${host.hostname || host.ip_address}"?`)) deleteHost.mutate(host.id) }} className="p-1 rounded hover:bg-destructive/20" title="Delete host">
-                                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </TreeFragment>
-                          )
-                        })}
+                        {vlanOpen && vlanNode.subnets.map((subnetNode) => (
+                          <SubnetRow key={`subnet-${subnetNode.subnet.id}`} subnetNode={subnetNode} expanded={expanded} toggle={toggle} setDialog={setDialog} deleteSubnet={deleteSubnet} deleteHost={deleteHost} indent="vlan" />
+                        ))}
                       </TreeFragment>
                     )
                   })}
+
+                  {/* Standalone subnets for this site */}
+                  {siteOpen && siteNode.standaloneSubnets.length > 0 && (
+                    <tr className="border-b border-border bg-muted/10">
+                      <td colSpan={4} className="px-2 md:px-3 py-1 pl-6 md:pl-8">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Standalone Subnets</span>
+                      </td>
+                    </tr>
+                  )}
+                  {siteOpen && siteNode.standaloneSubnets.map((subnetNode) => (
+                    <SubnetRow key={`subnet-${subnetNode.subnet.id}`} subnetNode={subnetNode} expanded={expanded} toggle={toggle} setDialog={setDialog} deleteSubnet={deleteSubnet} deleteHost={deleteHost} indent="site" />
+                  ))}
                 </TreeFragment>
               )
             })}
-            {tree.length === 0 && (
+            {/* Project-wide standalone subnets */}
+            {projectWideSubnets.length > 0 && (
+              <TreeFragment>
+                <tr className="border-b border-border bg-muted/30">
+                  <td colSpan={4} className="px-2 md:px-3 py-2">
+                    <span className="flex items-center gap-1.5 font-medium text-sm">
+                      <Network className="h-3.5 w-3.5 text-gray-500" />
+                      Project-Wide Subnets
+                      <span className="text-xs font-normal text-muted-foreground ml-1">
+                        ({projectWideSubnets.length})
+                      </span>
+                    </span>
+                  </td>
+                </tr>
+                {projectWideSubnets.map((subnetNode) => (
+                  <SubnetRow key={`subnet-${subnetNode.subnet.id}`} subnetNode={subnetNode} expanded={expanded} toggle={toggle} setDialog={setDialog} deleteSubnet={deleteSubnet} deleteHost={deleteHost} indent="site" />
+                ))}
+              </TreeFragment>
+            )}
+
+            {tree.length === 0 && projectWideSubnets.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-12">
                   <div className="flex flex-col items-center gap-4">
@@ -454,7 +442,8 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
       {dialog?.type === 'subnet' && (
         <Dialog open onOpenChange={closeDialog} title={dialog.mode === 'edit' ? 'Edit Subnet' : 'Add Subnet'}>
           <SubnetForm
-            vlanId={dialog.mode === 'edit' ? (dialog.entity as Subnet).vlan : dialog.parentId}
+            vlanId={dialog.mode === 'edit' ? ((dialog.entity as Subnet).vlan ?? undefined) : dialog.parentId}
+            siteId={dialog.mode === 'edit' ? ((dialog.entity as Subnet).site ?? undefined) : undefined}
             projectId={projectId}
             subnet={dialog.mode === 'edit' ? (dialog.entity as Subnet) : undefined}
             onClose={closeDialog}
@@ -555,6 +544,90 @@ function TunnelsTable({ projectId }: { projectId: number }) {
         <TunnelForm projectId={projectId} tunnel={editTunnel} onClose={() => setDialogOpen(false)} />
       </Dialog>
     </>
+  )
+}
+
+// ─── SubnetRow (shared between VLAN-attached and standalone) ──
+
+function SubnetRow({
+  subnetNode, expanded, toggle, setDialog, deleteSubnet, deleteHost, indent,
+}: {
+  subnetNode: SubnetNode
+  expanded: Set<string>
+  toggle: (key: string) => void
+  setDialog: (d: { type: 'host' | 'subnet'; mode: 'add' | 'edit'; parentId?: number; entity?: Subnet | Host } | null) => void
+  deleteSubnet: { mutate: (id: number) => void }
+  deleteHost: { mutate: (id: number) => void }
+  indent: 'vlan' | 'site'
+}) {
+  const subKey = `subnet-${subnetNode.subnet.id}`
+  const subOpen = expanded.has(subKey)
+  const pl = indent === 'vlan' ? 'pl-10 md:pl-14' : 'pl-6 md:pl-8'
+  const hostPl = indent === 'vlan' ? 'pl-14 md:pl-20' : 'pl-10 md:pl-14'
+
+  return (
+    <TreeFragment>
+      <tr className="border-b border-border hover:bg-accent/20">
+        <td className={cn('px-2 md:px-3 py-1.5', pl)}>
+          <button onClick={() => toggle(subKey)} className="flex items-center gap-1.5 text-sm">
+            {subOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+            <Network className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="font-mono text-xs">{subnetNode.subnet.network}</span>
+            <SubnetUtilBar network={subnetNode.subnet.network} hostCount={subnetNode.hosts.length} className="ml-2" />
+          </button>
+        </td>
+        <td className="px-2 md:px-3 py-1.5 text-muted-foreground text-xs hidden sm:table-cell">
+          {subnetNode.subnet.gateway ? `gw ${subnetNode.subnet.gateway}` : '-'}
+          {subnetNode.subnet.description && ` · ${subnetNode.subnet.description}`}
+        </td>
+        <td className="px-2 md:px-3 py-1.5 hidden md:table-cell"></td>
+        <td className="px-2 md:px-3 py-1.5">
+          <div className="flex justify-end gap-0.5">
+            <button onClick={() => setDialog({ type: 'host', mode: 'add', parentId: subnetNode.subnet.id })} className="p-1 rounded hover:bg-accent" title="Add host">
+              <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+            <button onClick={() => setDialog({ type: 'subnet', mode: 'edit', entity: subnetNode.subnet })} className="p-1 rounded hover:bg-accent" title="Edit subnet">
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+            <button onClick={() => { if (window.confirm(`Delete subnet "${subnetNode.subnet.network}"?`)) deleteSubnet.mutate(subnetNode.subnet.id) }} className="p-1 rounded hover:bg-destructive/20" title="Delete subnet">
+              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        </td>
+      </tr>
+
+      {/* Host rows */}
+      {subOpen && subnetNode.hosts.map((host) => (
+        <tr key={host.id} className="border-b border-border hover:bg-accent/20">
+          <td className={cn('px-2 md:px-3 py-1.5', hostPl)}>
+            <span className="flex items-center gap-1.5 text-sm">
+              <Server className="h-3 w-3 text-orange-500" />
+              <CopyableIP ip={host.ip_address} />
+              {host.hostname && (
+                <span className="text-muted-foreground hidden sm:inline">({host.hostname})</span>
+              )}
+            </span>
+          </td>
+          <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
+            {host.device_type}
+            {host.mac_address && ` · ${host.mac_address}`}
+          </td>
+          <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden md:table-cell">
+            {host.device_type}
+          </td>
+          <td className="px-2 md:px-3 py-1.5">
+            <div className="flex justify-end gap-0.5">
+              <button onClick={() => setDialog({ type: 'host', mode: 'edit', entity: host })} className="p-1 rounded hover:bg-accent" title="Edit host">
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              <button onClick={() => { if (window.confirm(`Delete host "${host.hostname || host.ip_address}"?`)) deleteHost.mutate(host.id) }} className="p-1 rounded hover:bg-destructive/20" title="Delete host">
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </div>
+          </td>
+        </tr>
+      ))}
+    </TreeFragment>
   )
 }
 

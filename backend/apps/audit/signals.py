@@ -31,7 +31,7 @@ def create_audit_log(instance, action, changes=None):
     elif hasattr(instance, "vlan"):
         project_id = instance.vlan.site.project_id
     elif hasattr(instance, "subnet"):
-        project_id = instance.subnet.vlan.site.project_id
+        project_id = instance.subnet.project_id
 
     AuditLog.objects.create(
         user=user,

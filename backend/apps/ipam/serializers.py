@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.projects.models import Site
+from apps.projects.models import Project, Site
 from apps.projects.serializers import SiteWanAddressSerializer
 from .models import VLAN, Host, Subnet, Tunnel
 from .validators import check_ip_duplicate_in_project, check_ip_in_subnet, check_subnet_overlap
@@ -21,7 +21,7 @@ class HostSerializer(serializers.ModelSerializer):
 
         if ip_address and subnet:
             check_ip_in_subnet(ip_address, subnet.network)
-            project = subnet.vlan.site.project
+            project = subnet.project
             check_ip_duplicate_in_project(
                 ip_address, project,
                 exclude_pk=self.instance.pk if self.instance else None,
@@ -32,21 +32,44 @@ class HostSerializer(serializers.ModelSerializer):
 
 class SubnetSerializer(serializers.ModelSerializer):
     host_count = serializers.IntegerField(read_only=True, default=0)
+    project = serializers.PrimaryKeyRelatedField(
+        queryset=Project.objects.all(),
+        required=False,
+    )
 
     class Meta:
         model = Subnet
         fields = [
-            "id", "vlan", "network", "gateway", "description",
+            "id", "project", "site", "vlan", "network", "gateway", "description",
             "host_count", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
-        vlan = attrs.get("vlan") or (self.instance and self.instance.vlan)
+        vlan = attrs.get("vlan", self.instance.vlan if self.instance else None)
+        site = attrs.get("site", self.instance.site if self.instance else None)
+        project = attrs.get("project", self.instance.project if self.instance else None)
         network = attrs.get("network") or (self.instance and self.instance.network)
 
-        if network and vlan:
+        # Auto-derive project/site from vlan when vlan is provided
+        if vlan:
+            attrs["site"] = vlan.site
+            attrs["project"] = vlan.site.project
+            site = vlan.site
             project = vlan.site.project
+        else:
+            # Without vlan, project is required
+            if not project:
+                raise serializers.ValidationError(
+                    {"project": "Project is required when no VLAN is specified."}
+                )
+            # Validate site belongs to project
+            if site and site.project_id != project.id:
+                raise serializers.ValidationError(
+                    {"site": "Site does not belong to the specified project."}
+                )
+
+        if network and project:
             check_subnet_overlap(
                 network, project,
                 exclude_pk=self.instance.pk if self.instance else None,
@@ -110,10 +133,15 @@ class VLANTopologySerializer(serializers.ModelSerializer):
 class SiteTopologySerializer(serializers.ModelSerializer):
     vlans = VLANTopologySerializer(many=True, read_only=True)
     wan_addresses = SiteWanAddressSerializer(many=True, read_only=True)
+    standalone_subnets = serializers.SerializerMethodField()
 
     class Meta:
         model = Site
-        fields = ["id", "name", "address", "latitude", "longitude", "wan_addresses", "vlans"]
+        fields = ["id", "name", "address", "latitude", "longitude", "wan_addresses", "vlans", "standalone_subnets"]
+
+    def get_standalone_subnets(self, obj):
+        qs = obj.subnets.filter(vlan__isnull=True)
+        return SubnetTopologySerializer(qs, many=True).data
 
 
 class TunnelTopologySerializer(serializers.ModelSerializer):
@@ -134,3 +162,4 @@ class ProjectTopologySerializer(serializers.Serializer):
     """Full topology data for a project - used by the topology view."""
     sites = SiteTopologySerializer(many=True, read_only=True)
     tunnels = TunnelTopologySerializer(many=True, read_only=True)
+    standalone_subnets = SubnetTopologySerializer(many=True, read_only=True)

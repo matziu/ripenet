@@ -6,6 +6,7 @@ import type { Subnet } from '@/types'
 
 interface SubnetFormProps {
   vlanId?: number
+  siteId?: number
   projectId?: number
   subnet?: Subnet
   onClose: () => void
@@ -18,9 +19,9 @@ interface FormValues {
   vlan: string
 }
 
-export function SubnetForm({ vlanId, projectId, subnet, onClose }: SubnetFormProps) {
+export function SubnetForm({ vlanId, siteId, projectId, subnet, onClose }: SubnetFormProps) {
   const queryClient = useQueryClient()
-  const needsVlanSelector = !vlanId && !subnet
+  const needsVlanSelector = !vlanId && !siteId && !subnet
 
   const { data: vlans } = useQuery({
     queryKey: ['vlans', { project: projectId }],
@@ -34,7 +35,7 @@ export function SubnetForm({ vlanId, projectId, subnet, onClose }: SubnetFormPro
       network: subnet.network,
       gateway: subnet.gateway ?? '',
       description: subnet.description,
-      vlan: String(subnet.vlan),
+      vlan: subnet.vlan ? String(subnet.vlan) : '',
     } : {
       gateway: '',
       vlan: vlanId ? String(vlanId) : '',
@@ -54,13 +55,35 @@ export function SubnetForm({ vlanId, projectId, subnet, onClose }: SubnetFormPro
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
-      const resolvedVlanId = vlanId ?? parseInt(data.vlan, 10)
-      const payload = {
+      const payload: Record<string, unknown> = {
         network: data.network,
         gateway: data.gateway || null,
         description: data.description,
-        vlan: resolvedVlanId,
       }
+
+      if (vlanId) {
+        // Under a VLAN — backend auto-derives project/site
+        payload.vlan = vlanId
+      } else if (siteId && projectId) {
+        // Site-level standalone (no VLAN)
+        payload.site = siteId
+        payload.project = projectId
+        payload.vlan = null
+      } else if (projectId && !siteId) {
+        // Project-wide standalone
+        payload.project = projectId
+        payload.site = null
+        payload.vlan = null
+      } else if (data.vlan) {
+        // VLAN chosen from selector
+        payload.vlan = parseInt(data.vlan, 10)
+      } else if (subnet) {
+        // Editing existing — preserve relations
+        payload.project = subnet.project
+        payload.site = subnet.site
+        payload.vlan = subnet.vlan
+      }
+
       return subnet
         ? subnetsApi.update(subnet.id, payload)
         : subnetsApi.create(payload)

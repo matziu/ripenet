@@ -56,7 +56,9 @@ export interface VLAN {
 
 export interface Subnet {
   id: number
-  vlan: number
+  project: number
+  site: number | null
+  vlan: number | null
   network: string
   gateway: string | null
   description: string
@@ -132,6 +134,7 @@ export interface SiteTopology {
   longitude: number | null
   wan_addresses: SiteWanAddress[]
   vlans: VLANTopology[]
+  standalone_subnets: SubnetTopology[]
 }
 
 export interface TunnelTopology {
@@ -151,6 +154,7 @@ export interface TunnelTopology {
 export interface ProjectTopology {
   sites: SiteTopology[]
   tunnels: TunnelTopology[]
+  standalone_subnets: SubnetTopology[]
 }
 
 // Search

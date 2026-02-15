@@ -281,7 +281,13 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
       />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Subnet">
-        <SubnetForm vlanId={subnet.vlan} subnet={subnet} onClose={() => setEditOpen(false)} />
+        <SubnetForm
+          vlanId={subnet.vlan ?? undefined}
+          siteId={subnet.site ?? undefined}
+          projectId={subnet.project}
+          subnet={subnet}
+          onClose={() => setEditOpen(false)}
+        />
       </Dialog>
 
       <Dialog open={addHostOpen} onOpenChange={setAddHostOpen} title="Add Host">

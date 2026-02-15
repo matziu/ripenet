@@ -51,15 +51,25 @@ class ProjectViewSet(viewsets.ModelViewSet):
                             ),
                         )
                     ),
-                )
+                ),
+                Prefetch(
+                    "subnets",
+                    queryset=Subnet.objects.filter(vlan__isnull=True).prefetch_related("hosts"),
+                ),
             )
         )
 
         tunnels = Tunnel.objects.filter(project=project).select_related("site_a", "site_b")
 
+        # Project-wide standalone subnets (no site, no vlan)
+        standalone_subnets = Subnet.objects.filter(
+            project=project, site__isnull=True, vlan__isnull=True,
+        ).prefetch_related("hosts")
+
         data = {
             "sites": sites,
             "tunnels": tunnels,
+            "standalone_subnets": standalone_subnets,
         }
         serializer = ProjectTopologySerializer(data)
         return Response(serializer.data)
