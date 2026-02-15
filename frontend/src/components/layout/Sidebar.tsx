@@ -284,7 +284,6 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
           <Plus className="h-3 w-3" />
         </button>
         <DropdownMenu items={[
-          { label: 'Add Subnet', icon: <Plus className="h-3 w-3" />, onClick: () => setAddStandaloneSubnetOpen(true) },
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
           { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
             if (window.confirm(`Delete site "${site.name}"?`)) deleteMutation.mutate()
@@ -292,20 +291,43 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
         ]} />
       </div>
 
-      {expanded && (vlans.length > 0 || (standaloneSubnets && standaloneSubnets.length > 0)) && (
+      {expanded && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
           {vlans.map((vlan) => (
             <VlanTreeItem key={vlan.id} vlan={vlan} siteId={site.id} />
           ))}
           {standaloneSubnets && standaloneSubnets.length > 0 && (
             <>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider px-1.5 pt-1">
-                Standalone
+              <div className="flex items-center justify-between px-1.5 pt-1">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Subnets
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setAddStandaloneSubnetOpen(true) }}
+                  className="p-0.5 rounded hover:bg-accent transition-opacity shrink-0"
+                  title="Add subnet"
+                >
+                  <Plus className="h-3 w-3 text-muted-foreground" />
+                </button>
               </div>
               {standaloneSubnets.map((subnet) => (
                 <SubnetTreeItem key={subnet.id} subnet={subnet} />
               ))}
             </>
+          )}
+          {(!standaloneSubnets || standaloneSubnets.length === 0) && (
+            <div className="flex items-center justify-between px-1.5 pt-1">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                Subnets
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setAddStandaloneSubnetOpen(true) }}
+                className="p-0.5 rounded hover:bg-accent transition-opacity shrink-0"
+                title="Add subnet"
+              >
+                <Plus className="h-3 w-3 text-muted-foreground" />
+              </button>
+            </div>
           )}
         </div>
       )}

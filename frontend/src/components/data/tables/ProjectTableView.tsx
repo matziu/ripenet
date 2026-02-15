@@ -188,6 +188,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
     type: 'site' | 'vlan' | 'subnet' | 'host'
     mode: 'add' | 'edit'
     parentId?: number
+    siteId?: number
     entity?: Site | VLAN | Subnet | Host
   } | null>(null)
 
@@ -287,6 +288,9 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                       <div className="flex justify-end gap-0.5">
                         <button onClick={() => setDialog({ type: 'vlan', mode: 'add', parentId: siteNode.site.id })} className="p-1 rounded hover:bg-accent" title="Add VLAN">
                           <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                        <button onClick={() => setDialog({ type: 'subnet', mode: 'add', siteId: siteNode.site.id })} className="p-1 rounded hover:bg-accent" title="Add subnet (standalone)">
+                          <Network className="h-3.5 w-3.5 text-muted-foreground" />
                         </button>
                         <button onClick={() => setDialog({ type: 'site', mode: 'edit', entity: siteNode.site })} className="p-1 rounded hover:bg-accent" title="Edit site">
                           <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -415,7 +419,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
         <Dialog open onOpenChange={closeDialog} title={dialog.mode === 'edit' ? 'Edit Subnet' : 'Add Subnet'}>
           <SubnetForm
             vlanId={dialog.mode === 'edit' ? ((dialog.entity as Subnet).vlan ?? undefined) : dialog.parentId}
-            siteId={dialog.mode === 'edit' ? ((dialog.entity as Subnet).site ?? undefined) : undefined}
+            siteId={dialog.mode === 'edit' ? ((dialog.entity as Subnet).site ?? undefined) : dialog.siteId}
             projectId={projectId}
             subnet={dialog.mode === 'edit' ? (dialog.entity as Subnet) : undefined}
             onClose={closeDialog}
