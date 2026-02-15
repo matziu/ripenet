@@ -1,6 +1,6 @@
 import type {
   Project, Site, VLAN, Subnet, Host, Tunnel,
-  ProjectTopology, SearchResult, PaginatedResponse, AuditLog, User,
+  ProjectTopology, SearchResult, PaginatedResponse, AuditLog, User, UserAdmin,
 } from '@/types'
 import apiClient from './client'
 
@@ -98,6 +98,20 @@ export const tunnelsApi = {
     apiClient.patch<Tunnel>(`/tunnels/${id}/`, data),
   delete: (id: number) =>
     apiClient.delete(`/tunnels/${id}/`),
+}
+
+// Users (admin)
+export const usersApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<PaginatedResponse<UserAdmin>>('/users/', { params }),
+  get: (id: number) =>
+    apiClient.get<UserAdmin>(`/users/${id}/`),
+  create: (data: Partial<UserAdmin>) =>
+    apiClient.post<UserAdmin>('/users/', data),
+  update: (id: number, data: Partial<UserAdmin>) =>
+    apiClient.patch<UserAdmin>(`/users/${id}/`, data),
+  delete: (id: number) =>
+    apiClient.delete(`/users/${id}/`),
 }
 
 // Search

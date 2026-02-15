@@ -1,9 +1,11 @@
 import { useUIStore } from '@/stores/ui.store'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { authApi } from '@/api/endpoints'
 import { cn } from '@/lib/utils'
 import {
   Search, Moon, Sun, PanelLeftClose, PanelLeft,
-  Network, Map, Table,
+  Network, Map, Table, Users,
 } from 'lucide-react'
 
 export function TopBar() {
@@ -14,6 +16,12 @@ export function TopBar() {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
   const location = useLocation()
+
+  const { data: me } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => authApi.me(),
+    select: (res) => res.data,
+  })
 
   // Derive active view from URL
   const pathAfterProject = projectId
@@ -87,6 +95,16 @@ export function TopBar() {
               </button>
             ))}
           </div>
+        )}
+
+        {me?.role === 'admin' && (
+          <button
+            onClick={() => navigate('/users')}
+            className="p-1.5 rounded-md hover:bg-accent"
+            title="Manage Users"
+          >
+            <Users className="h-4 w-4" />
+          </button>
         )}
 
         <button onClick={toggleDarkMode} className="p-1.5 rounded-md hover:bg-accent" title="Toggle dark mode">

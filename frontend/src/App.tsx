@@ -7,6 +7,7 @@ import { ProjectPage } from '@/pages/ProjectPage'
 import { ProjectsListPage } from '@/pages/ProjectsListPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { WizardPage } from '@/pages/WizardPage'
+import { UsersPage } from '@/pages/UsersPage'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { useUIStore } from '@/stores/ui.store'
 import { authApi } from '@/api/endpoints'
@@ -63,6 +64,7 @@ function App() {
           <Route path="/projects" element={<ProjectsListPage />} />
           <Route path="/projects/:projectId/*" element={<ProjectPage />} />
           <Route path="/wizard" element={<WizardPage />} />
+          <Route path="/users" element={<UsersPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

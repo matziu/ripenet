@@ -5,6 +5,18 @@ export interface User {
   role: 'admin' | 'editor' | 'viewer'
   first_name: string
   last_name: string
+  is_active?: boolean
+}
+
+export interface UserAdmin {
+  id: number
+  username: string
+  email: string
+  role: 'admin' | 'editor' | 'viewer'
+  first_name: string
+  last_name: string
+  is_active: boolean
+  password?: string
 }
 
 export interface Project {
