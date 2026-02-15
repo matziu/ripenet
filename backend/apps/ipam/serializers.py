@@ -142,6 +142,8 @@ class SiteTopologySerializer(serializers.ModelSerializer):
     vlans = VLANTopologySerializer(many=True, read_only=True)
     wan_addresses = SiteWanAddressSerializer(many=True, read_only=True)
     standalone_subnets = serializers.SerializerMethodField()
+    latitude = serializers.FloatField(allow_null=True)
+    longitude = serializers.FloatField(allow_null=True)
 
     class Meta:
         model = Site

@@ -13,6 +13,8 @@ class SiteSerializer(serializers.ModelSerializer):
     vlan_count = serializers.IntegerField(read_only=True, default=0)
     host_count = serializers.IntegerField(read_only=True, default=0)
     wan_addresses = SiteWanAddressSerializer(many=True, required=False, default=[])
+    latitude = serializers.FloatField(allow_null=True, required=False)
+    longitude = serializers.FloatField(allow_null=True, required=False)
 
     class Meta:
         model = Site
