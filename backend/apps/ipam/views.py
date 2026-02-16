@@ -43,14 +43,14 @@ class SubnetViewSet(viewsets.ModelViewSet):
         network = ipaddress.ip_network(str(subnet_obj.network), strict=False)
 
         used_ips = set(
-            str(h.ip_address) for h in subnet_obj.hosts.all()
+            str(h.ip_address).split("/")[0] for h in subnet_obj.hosts.all()
         )
         # Also check tunnel IPs in the same project
         project = subnet_obj.project
         tunnels = Tunnel.objects.filter(project=project)
         for t in tunnels:
-            used_ips.add(str(t.ip_a))
-            used_ips.add(str(t.ip_b))
+            used_ips.add(str(t.ip_a).split("/")[0])
+            used_ips.add(str(t.ip_b).split("/")[0])
 
         # Skip network and broadcast addresses
         hosts = list(network.hosts())
