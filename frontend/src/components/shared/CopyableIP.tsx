@@ -13,13 +13,14 @@ export function CopyableIP({ ip, className }: CopyableIPProps) {
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation()
+    const bare = ip.split('/')[0]
     try {
       if (navigator.clipboard) {
-        await navigator.clipboard.writeText(ip)
+        await navigator.clipboard.writeText(bare)
       } else {
         // Fallback for non-HTTPS contexts
         const textarea = document.createElement('textarea')
-        textarea.value = ip
+        textarea.value = bare
         textarea.style.position = 'fixed'
         textarea.style.opacity = '0'
         document.body.appendChild(textarea)
@@ -28,7 +29,7 @@ export function CopyableIP({ ip, className }: CopyableIPProps) {
         document.body.removeChild(textarea)
       }
       setCopied(true)
-      toast.success(`Copied: ${ip}`)
+      toast.success(`Copied: ${bare}`)
       setTimeout(() => setCopied(false), 2000)
     } catch {
       toast.error('Failed to copy')
