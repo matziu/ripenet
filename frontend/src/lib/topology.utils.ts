@@ -451,6 +451,33 @@ export function topologyToFlow(
   const nodeIdSet = new Set(nodes.map(n => n.id))
 
   topology.tunnels.forEach((tunnel) => {
+    // Resolve source node (site_a) — may need virtual node for cross-project view
+    let sourceNodeId = `site-${tunnel.site_a}`
+    if (!nodeIdSet.has(sourceNodeId)) {
+      const xId = `xsite-${tunnel.site_a}`
+      if (!nodeIdSet.has(xId)) {
+        nodes.push({
+          id: xId,
+          type: 'siteNode',
+          position: savedPositions?.[xId] ?? { x: 0, y: 0 },
+          data: {
+            label: tunnel.site_a_name,
+            address: '',
+            vlanCount: 0,
+            hostCount: 0,
+            siteId: tunnel.site_a,
+            expanded: false,
+            vlans: [],
+            standaloneSubnets: [],
+            wanAddresses: [],
+          } satisfies SiteNodeData,
+        })
+        nodeIdSet.add(xId)
+      }
+      sourceNodeId = xId
+    }
+
+    // Resolve target node (site_b or external)
     let targetNodeId: string
 
     if (tunnel.site_b && nodeIdSet.has(`site-${tunnel.site_b}`)) {
@@ -522,7 +549,7 @@ export function topologyToFlow(
 
     edges.push({
       id: `tunnel-${tunnel.id}`,
-      source: `site-${tunnel.site_a}`,
+      source: sourceNodeId,
       target: targetNodeId,
       type: 'tunnelEdge',
       label: tunnel.tunnel_subnet,
