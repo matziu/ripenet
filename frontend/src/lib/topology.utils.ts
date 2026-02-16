@@ -446,6 +446,7 @@ export function topologyToFlow(
 
   // Create tunnel edges
   topology.tunnels.forEach((tunnel) => {
+    if (!tunnel.site_b) return
     edges.push({
       id: `tunnel-${tunnel.id}`,
       source: `site-${tunnel.site_a}`,

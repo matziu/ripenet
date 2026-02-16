@@ -380,7 +380,23 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                 <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
                   <span className="font-mono">{tunnel.tunnel_subnet}</span>
                   {' · '}
-                  {tunnel.site_a_name} (<CopyableIP ip={tunnel.ip_a} />) → {tunnel.site_b_name} (<CopyableIP ip={tunnel.ip_b} />)
+                  {tunnel.site_a_name} (<CopyableIP ip={tunnel.ip_a} />) →{' '}
+                  {tunnel.site_b ? (
+                    <>
+                      {tunnel.site_b_project_id && tunnel.site_b_project_id !== projectId && (
+                        <a
+                          href={`/projects/${tunnel.site_b_project_id}`}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/projects/${tunnel.site_b_project_id}`) }}
+                          className="text-primary hover:underline"
+                        >
+                          {tunnel.site_b_project_name} /
+                        </a>
+                      )}{' '}
+                      {tunnel.site_b_name} (<CopyableIP ip={tunnel.ip_b} />)
+                    </>
+                  ) : (
+                    <span className="italic text-muted-foreground">{tunnel.external_endpoint} (<CopyableIP ip={tunnel.ip_b} />)</span>
+                  )}
                 </td>
                 <td className="px-2 md:px-3 py-1.5 hidden md:table-cell">
                   <span className={cn(

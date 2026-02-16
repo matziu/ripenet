@@ -103,9 +103,12 @@ export interface Tunnel {
   site_a: number
   site_a_name: string
   ip_a: string
-  site_b: number
-  site_b_name: string
+  site_b: number | null
+  site_b_name: string | null
+  site_b_project_id: number | null
+  site_b_project_name: string | null
   ip_b: string
+  external_endpoint: string
   enabled: boolean
   description: string
   created_at: string
@@ -155,9 +158,12 @@ export interface TunnelTopology {
   site_a: number
   site_a_name: string
   ip_a: string
-  site_b: number
-  site_b_name: string
+  site_b: number | null
+  site_b_name: string | null
+  site_b_project_id: number | null
+  site_b_project_name: string | null
   ip_b: string
+  external_endpoint: string
   enabled: boolean
 }
 

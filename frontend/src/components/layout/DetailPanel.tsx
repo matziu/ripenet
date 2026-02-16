@@ -351,7 +351,11 @@ function TunnelDetail({ tunnelId, projectId }: { tunnelId: number; projectId: nu
         <DetailRow label="Subnet" value={tunnel.tunnel_subnet} mono />
         <DetailRow label="Site A" value={tunnel.site_a_name} />
         <DetailRow label="IP A" value={tunnel.ip_a} mono />
-        <DetailRow label="Site B" value={tunnel.site_b_name} />
+        {tunnel.site_b_name ? (
+          <DetailRow label="Site B" value={tunnel.site_b_project_name ? `${tunnel.site_b_project_name} / ${tunnel.site_b_name}` : tunnel.site_b_name} />
+        ) : (
+          <DetailRow label="External" value={tunnel.external_endpoint} />
+        )}
         <DetailRow label="IP B" value={tunnel.ip_b} mono />
         {tunnel.description && <DetailRow label="Description" value={tunnel.description} />}
       </dl>

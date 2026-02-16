@@ -101,6 +101,7 @@ export function GeoMap({ projectId }: GeoMapProps) {
       })}
 
       {topology.tunnels.map((tunnel) => {
+        if (!tunnel.site_b) return null
         const sA = siteMap.get(tunnel.site_a)
         const sB = siteMap.get(tunnel.site_b)
         if (!sA?.latitude || !sA?.longitude || !sB?.latitude || !sB?.longitude) return null
