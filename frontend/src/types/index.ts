@@ -162,6 +162,8 @@ export interface TunnelTopology {
   site_b_name: string | null
   site_b_project_id: number | null
   site_b_project_name: string | null
+  site_b_latitude: number | null
+  site_b_longitude: number | null
   ip_b: string
   external_endpoint: string
   enabled: boolean

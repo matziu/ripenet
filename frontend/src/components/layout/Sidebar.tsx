@@ -640,6 +640,12 @@ function TunnelTreeItem({ tunnel, projectId }: { tunnel: Tunnel; projectId: numb
         >
           <Cable className={cn("h-3 w-3 shrink-0", !tunnel.enabled && "opacity-40")} />
           <span className={cn("truncate", !tunnel.enabled && "opacity-50")}>{tunnel.name}</span>
+          {!tunnel.site_b && (
+            <span className="text-[9px] text-muted-foreground shrink-0">EXT</span>
+          )}
+          {tunnel.site_b_project_id && tunnel.site_b_project_id !== projectId && (
+            <span className="text-[9px] text-amber-500 shrink-0">XP</span>
+          )}
           <span className="ml-auto text-[10px] text-muted-foreground uppercase shrink-0">{tunnel.tunnel_type}</span>
         </button>
         <DropdownMenu items={[

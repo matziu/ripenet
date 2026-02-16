@@ -103,17 +103,25 @@ export function GeoMap({ projectId }: GeoMapProps) {
       {topology.tunnels.map((tunnel) => {
         if (!tunnel.site_b) return null
         const sA = siteMap.get(tunnel.site_a)
-        const sB = siteMap.get(tunnel.site_b)
-        if (!sA?.latitude || !sA?.longitude || !sB?.latitude || !sB?.longitude) return null
+        if (!sA?.latitude || !sA?.longitude) return null
 
-        const color = tunnel.enabled ? '#22c55e' : '#94a3b8'
+        // Check if site_b is in current project's sites
+        const sB = siteMap.get(tunnel.site_b)
+        const bLat = sB?.latitude ?? tunnel.site_b_latitude
+        const bLng = sB?.longitude ?? tunnel.site_b_longitude
+        if (!bLat || !bLng) return null
+
+        const isCrossProject = !sB && tunnel.site_b_project_id !== null
+        const color = tunnel.enabled
+          ? (isCrossProject ? '#f59e0b' : '#22c55e')
+          : '#94a3b8'
 
         return (
           <Polyline
             key={tunnel.id}
             positions={[
               [sA.latitude, sA.longitude],
-              [sB.latitude, sB.longitude],
+              [bLat, bLng],
             ]}
             color={color}
             weight={2}

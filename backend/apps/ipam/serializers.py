@@ -175,13 +175,16 @@ class TunnelTopologySerializer(serializers.ModelSerializer):
     site_b_name = serializers.CharField(source="site_b.name", read_only=True, default=None)
     site_b_project_id = serializers.IntegerField(source="site_b.project_id", read_only=True, default=None)
     site_b_project_name = serializers.CharField(source="site_b.project.name", read_only=True, default=None)
+    site_b_latitude = serializers.FloatField(source="site_b.latitude", read_only=True, default=None)
+    site_b_longitude = serializers.FloatField(source="site_b.longitude", read_only=True, default=None)
 
     class Meta:
         model = Tunnel
         fields = [
             "id", "name", "tunnel_type", "tunnel_subnet",
             "site_a", "site_a_name", "ip_a",
-            "site_b", "site_b_name", "site_b_project_id", "site_b_project_name", "ip_b",
+            "site_b", "site_b_name", "site_b_project_id", "site_b_project_name",
+            "site_b_latitude", "site_b_longitude", "ip_b",
             "external_endpoint", "enabled",
         ]
 

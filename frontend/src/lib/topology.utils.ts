@@ -88,6 +88,9 @@ export interface TunnelEdgeData {
   ipA: string
   ipB: string
   offsetSide: number
+  externalEndpoint?: string
+  crossProjectName?: string
+  crossProjectId?: number
   [key: string]: unknown
 }
 
@@ -444,23 +447,86 @@ export function topologyToFlow(
     })
   })
 
-  // Create tunnel edges
+  // Create tunnel edges (with virtual nodes for cross-project/external)
+  const nodeIdSet = new Set(nodes.map(n => n.id))
+
   topology.tunnels.forEach((tunnel) => {
-    if (!tunnel.site_b) return
+    let targetNodeId: string
+
+    if (tunnel.site_b && nodeIdSet.has(`site-${tunnel.site_b}`)) {
+      // Internal tunnel — target node already exists
+      targetNodeId = `site-${tunnel.site_b}`
+    } else if (tunnel.site_b) {
+      // Cross-project tunnel — site_b exists but not in this project's topology nodes
+      targetNodeId = `xsite-${tunnel.site_b}`
+      if (!nodeIdSet.has(targetNodeId)) {
+        const label = tunnel.site_b_project_name
+          ? `${tunnel.site_b_project_name} / ${tunnel.site_b_name}`
+          : tunnel.site_b_name ?? 'Remote Site'
+        nodes.push({
+          id: targetNodeId,
+          type: 'siteNode',
+          position: savedPositions?.[targetNodeId] ?? { x: 0, y: 0 },
+          data: {
+            label,
+            address: '',
+            vlanCount: 0,
+            hostCount: 0,
+            siteId: tunnel.site_b,
+            expanded: false,
+            vlans: [],
+            standaloneSubnets: [],
+            wanAddresses: [],
+          } satisfies SiteNodeData,
+        })
+        nodeIdSet.add(targetNodeId)
+      }
+    } else {
+      // External tunnel — no site_b
+      targetNodeId = `ext-${tunnel.id}`
+      nodes.push({
+        id: targetNodeId,
+        type: 'siteNode',
+        position: savedPositions?.[targetNodeId] ?? { x: 0, y: 0 },
+        data: {
+          label: tunnel.external_endpoint || 'External',
+          address: '',
+          vlanCount: 0,
+          hostCount: 0,
+          siteId: 0,
+          expanded: false,
+          vlans: [],
+          standaloneSubnets: [],
+          wanAddresses: [],
+        } satisfies SiteNodeData,
+      })
+      nodeIdSet.add(targetNodeId)
+    }
+
+    const edgeData: TunnelEdgeData = {
+      label: tunnel.tunnel_subnet,
+      tunnelType: tunnel.tunnel_type,
+      enabled: tunnel.enabled,
+      ipA: tunnel.ip_a,
+      ipB: tunnel.ip_b,
+      offsetSide: 1,
+    }
+
+    if (tunnel.external_endpoint) {
+      edgeData.externalEndpoint = tunnel.external_endpoint
+    }
+    if (tunnel.site_b_project_id && tunnel.site_b_project_name) {
+      edgeData.crossProjectName = `${tunnel.site_b_project_name} / ${tunnel.site_b_name}`
+      edgeData.crossProjectId = tunnel.site_b_project_id
+    }
+
     edges.push({
       id: `tunnel-${tunnel.id}`,
       source: `site-${tunnel.site_a}`,
-      target: `site-${tunnel.site_b}`,
+      target: targetNodeId,
       type: 'tunnelEdge',
       label: tunnel.tunnel_subnet,
-      data: {
-        label: tunnel.tunnel_subnet,
-        tunnelType: tunnel.tunnel_type,
-        enabled: tunnel.enabled,
-        ipA: tunnel.ip_a,
-        ipB: tunnel.ip_b,
-        offsetSide: 1,
-      } satisfies TunnelEdgeData,
+      data: edgeData,
     })
   })
 
