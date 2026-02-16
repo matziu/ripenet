@@ -101,17 +101,33 @@ class VLANSerializer(serializers.ModelSerializer):
 
 class TunnelSerializer(serializers.ModelSerializer):
     site_a_name = serializers.CharField(source="site_a.name", read_only=True)
-    site_b_name = serializers.CharField(source="site_b.name", read_only=True)
+    site_b_name = serializers.CharField(source="site_b.name", read_only=True, default=None)
+    site_b_project_id = serializers.IntegerField(source="site_b.project_id", read_only=True, default=None)
+    site_b_project_name = serializers.CharField(source="site_b.project.name", read_only=True, default=None)
 
     class Meta:
         model = Tunnel
         fields = [
             "id", "project", "name", "tunnel_type", "tunnel_subnet",
             "site_a", "site_a_name", "ip_a",
-            "site_b", "site_b_name", "ip_b",
+            "site_b", "site_b_name", "site_b_project_id", "site_b_project_name", "ip_b",
+            "external_endpoint",
             "enabled", "description", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        site_b = attrs.get("site_b")
+        external = attrs.get("external_endpoint", "")
+        if site_b and external:
+            raise serializers.ValidationError("Cannot set both site_b and external_endpoint.")
+        if not site_b and not external:
+            raise serializers.ValidationError("Either site_b or external_endpoint is required.")
+        site_a = attrs.get("site_a") or (self.instance and self.instance.site_a)
+        project = attrs.get("project") or (self.instance and self.instance.project)
+        if site_a and project and site_a.project_id != project.id:
+            raise serializers.ValidationError({"site_a": "Site A must belong to the tunnel's project."})
+        return attrs
 
 
 # --- Topology serializers (nested, read-only) ---
@@ -156,15 +172,17 @@ class SiteTopologySerializer(serializers.ModelSerializer):
 
 class TunnelTopologySerializer(serializers.ModelSerializer):
     site_a_name = serializers.CharField(source="site_a.name", read_only=True)
-    site_b_name = serializers.CharField(source="site_b.name", read_only=True)
+    site_b_name = serializers.CharField(source="site_b.name", read_only=True, default=None)
+    site_b_project_id = serializers.IntegerField(source="site_b.project_id", read_only=True, default=None)
+    site_b_project_name = serializers.CharField(source="site_b.project.name", read_only=True, default=None)
 
     class Meta:
         model = Tunnel
         fields = [
             "id", "name", "tunnel_type", "tunnel_subnet",
             "site_a", "site_a_name", "ip_a",
-            "site_b", "site_b_name", "ip_b",
-            "enabled",
+            "site_b", "site_b_name", "site_b_project_id", "site_b_project_name", "ip_b",
+            "external_endpoint", "enabled",
         ]
 
 

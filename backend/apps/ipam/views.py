@@ -83,7 +83,7 @@ class TunnelViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "description"]
 
     def get_queryset(self):
-        qs = Tunnel.objects.select_related("site_a", "site_b", "project")
+        qs = Tunnel.objects.select_related("site_a", "site_b", "site_b__project", "project")
         project_pk = self.kwargs.get("project_pk")
         if project_pk:
             qs = qs.filter(project_id=project_pk)

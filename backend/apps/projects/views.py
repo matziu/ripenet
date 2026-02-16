@@ -1,4 +1,4 @@
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from rest_framework import viewsets
@@ -59,7 +59,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
             )
         )
 
-        tunnels = Tunnel.objects.filter(project=project).select_related("site_a", "site_b")
+        tunnels = Tunnel.objects.filter(
+            Q(project=project) | Q(site_b__project=project)
+        ).select_related("site_a", "site_b", "site_b__project").distinct()
 
         data = {
             "sites": sites,
