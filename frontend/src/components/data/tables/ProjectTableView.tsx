@@ -397,25 +397,34 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                   </span>
                 </td>
                 <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
-                  <span className="font-mono">{tunnel.tunnel_subnet}</span>
-                  {' · '}
-                  {tunnel.site_a_name} (<CopyableIP ip={tunnel.ip_a} />) →{' '}
-                  {tunnel.site_b ? (
-                    <>
-                      {tunnel.site_b_project_id && tunnel.site_b_project_id !== projectId && (
-                        <a
-                          href={`/projects/${tunnel.site_b_project_id}`}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/projects/${tunnel.site_b_project_id}`) }}
-                          className="text-primary hover:underline"
-                        >
-                          {tunnel.site_b_project_name} /
-                        </a>
-                      )}{' '}
-                      {tunnel.site_b_name} (<CopyableIP ip={tunnel.ip_b} />)
-                    </>
-                  ) : (
-                    <span className="italic text-muted-foreground">{tunnel.external_endpoint} (<CopyableIP ip={tunnel.ip_b} />)</span>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-foreground">{tunnel.tunnel_subnet}</span>
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      <span className="text-foreground">{tunnel.site_a_name}</span>
+                      <CopyableIP ip={tunnel.ip_a} className="!text-[11px]" />
+                      <span className="text-muted-foreground mx-0.5">→</span>
+                      {tunnel.site_b ? (
+                        <>
+                          {tunnel.site_b_project_id && tunnel.site_b_project_id !== projectId && (
+                            <a
+                              href={`/projects/${tunnel.site_b_project_id}`}
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/projects/${tunnel.site_b_project_id}`) }}
+                              className="text-amber-500 hover:underline"
+                            >
+                              {tunnel.site_b_project_name} /
+                            </a>
+                          )}
+                          <span className="text-foreground">{tunnel.site_b_name}</span>
+                          <CopyableIP ip={tunnel.ip_b} className="!text-[11px]" />
+                        </>
+                      ) : (
+                        <>
+                          <span className="italic">{tunnel.external_endpoint}</span>
+                          <CopyableIP ip={tunnel.ip_b} className="!text-[11px]" />
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </td>
                 <td className="px-2 md:px-3 py-1.5 hidden md:table-cell">
                   <span className={cn(
