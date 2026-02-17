@@ -23,6 +23,16 @@ class Host(models.Model):
     hostname = models.CharField(max_length=255, blank=True)
     mac_address = models.CharField(max_length=17, blank=True, help_text="MAC address (XX:XX:XX:XX:XX:XX)")
     device_type = models.CharField(max_length=20, choices=DeviceType.choices, default=DeviceType.OTHER)
+
+    class IPType(models.TextChoices):
+        STATIC = "static", "Static IP"
+        DHCP_LEASE = "dhcp_lease", "DHCP Static Lease"
+
+    ip_type = models.CharField(max_length=20, choices=IPType.choices, default=IPType.STATIC)
+    dhcp_pool = models.ForeignKey(
+        "ipam.DHCPPool", on_delete=models.CASCADE, related_name="leases",
+        null=True, blank=True,
+    )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
