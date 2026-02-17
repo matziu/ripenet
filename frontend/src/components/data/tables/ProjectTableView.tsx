@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi } from '@/api/endpoints'
+import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { Dialog } from '@/components/ui/Dialog'
@@ -9,13 +9,14 @@ import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
 import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
+import { DHCPPoolForm } from '@/components/data/forms/DHCPPoolForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { cn } from '@/lib/utils'
 import {
-  Plus, Pencil, Trash2, Globe, Cable,
+  Plus, Pencil, Trash2, Globe, Cable, Layers,
   Building2, Network, Server, ChevronDown, ChevronRight, MapPin, Wand2,
 } from 'lucide-react'
-import type { Site, VLAN, Subnet, Host, Tunnel } from '@/types'
+import type { Site, VLAN, Subnet, Host, Tunnel, DHCPPool } from '@/types'
 
 // ─── Tree node types ──────────────────────────────────────────
 
@@ -33,6 +34,7 @@ interface VlanNode {
 interface SubnetNode {
   subnet: Subnet
   hosts: Host[]
+  dhcpPools: DHCPPool[]
 }
 
 // ─── Main component ──────────────────────────────────────────
@@ -78,6 +80,11 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
     queryFn: () => hostsApi.list({ project: String(projectId) }),
     select: (res) => res.data.results,
   })
+  const { data: dhcpPools } = useQuery({
+    queryKey: ['dhcp-pools', { project: projectId }],
+    queryFn: () => dhcpPoolsApi.list({ project: String(projectId) }),
+    select: (res) => res.data.results,
+  })
   const { data: tunnels } = useQuery({
     queryKey: ['tunnels', { project: projectId }],
     queryFn: () => tunnelsApi.list({ project: String(projectId) }),
@@ -95,11 +102,18 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
       hostsBySubnet.set(h.subnet, arr)
     }
 
+    const poolsBySubnet = new Map<number, DHCPPool[]>()
+    for (const p of (dhcpPools ?? [])) {
+      const arr = poolsBySubnet.get(p.subnet) ?? []
+      arr.push(p)
+      poolsBySubnet.set(p.subnet, arr)
+    }
+
     const subnetsByVlan = new Map<number, SubnetNode[]>()
     const standaloneBySite = new Map<number, SubnetNode[]>()
 
     for (const s of subnets) {
-      const node: SubnetNode = { subnet: s, hosts: hostsBySubnet.get(s.id) ?? [] }
+      const node: SubnetNode = { subnet: s, hosts: hostsBySubnet.get(s.id) ?? [], dhcpPools: poolsBySubnet.get(s.id) ?? [] }
       if (s.vlan) {
         const arr = subnetsByVlan.get(s.vlan) ?? []
         arr.push(node)
@@ -123,7 +137,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
       vlans: vlansBySite.get(site.id) ?? [],
       standaloneSubnets: standaloneBySite.get(site.id) ?? [],
     }))
-  }, [sites, vlans, subnets, hosts])
+  }, [sites, vlans, subnets, hosts, dhcpPools])
 
   // Expand/collapse state
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -161,11 +175,11 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
 
   // CRUD dialog state
   const [dialog, setDialog] = useState<{
-    type: 'site' | 'vlan' | 'subnet' | 'host' | 'tunnel'
+    type: 'site' | 'vlan' | 'subnet' | 'host' | 'tunnel' | 'dhcpPool'
     mode: 'add' | 'edit'
     parentId?: number
     siteId?: number
-    entity?: Site | VLAN | Subnet | Host | Tunnel
+    entity?: Site | VLAN | Subnet | Host | Tunnel | DHCPPool
   } | null>(null)
 
   const closeDialog = () => setDialog(null)
@@ -191,8 +205,13 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
     mutationFn: (id: number) => tunnelsApi.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tunnels'] }); queryClient.invalidateQueries({ queryKey: ['topology'] }) },
   })
+  const deleteDhcpPool = useMutation({
+    mutationFn: (id: number) => dhcpPoolsApi.delete(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] }); queryClient.invalidateQueries({ queryKey: ['topology'] }) },
+  })
 
   const totalHosts = hosts?.length ?? 0
+  const totalPools = dhcpPools?.length ?? 0
   const totalTunnels = tunnels?.length ?? 0
 
   return (
@@ -201,7 +220,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
       <div className="flex items-center justify-between mb-3 gap-2">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <h3 className="text-xs md:text-sm font-medium text-muted-foreground truncate">
-            {sites?.length ?? 0} sites, {vlans?.length ?? 0} VLANs, {subnets?.length ?? 0} subnets, {totalHosts} hosts, {totalTunnels} tunnels
+            {sites?.length ?? 0} sites, {vlans?.length ?? 0} VLANs, {subnets?.length ?? 0} subnets, {totalHosts} hosts, {totalPools} pools, {totalTunnels} tunnels
           </h3>
           <div className="flex gap-1 text-[10px] shrink-0">
             <button onClick={expandAll} className="rounded border border-border px-1.5 py-0.5 hover:bg-accent text-muted-foreground">
@@ -329,7 +348,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
 
                         {/* Subnet rows */}
                         {vlanOpen && vlanNode.subnets.map((subnetNode) => (
-                          <SubnetRow key={`subnet-${subnetNode.subnet.id}`} subnetNode={subnetNode} expanded={expanded} toggle={toggle} setDialog={setDialog} deleteSubnet={deleteSubnet} deleteHost={deleteHost} indent="vlan" />
+                          <SubnetRow key={`subnet-${subnetNode.subnet.id}`} subnetNode={subnetNode} expanded={expanded} toggle={toggle} setDialog={setDialog} deleteSubnet={deleteSubnet} deleteHost={deleteHost} deleteDhcpPool={deleteDhcpPool} indent="vlan" />
                         ))}
                       </TreeFragment>
                     )
@@ -344,7 +363,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
                     </tr>
                   )}
                   {siteOpen && siteNode.standaloneSubnets.map((subnetNode) => (
-                    <SubnetRow key={`subnet-${subnetNode.subnet.id}`} subnetNode={subnetNode} expanded={expanded} toggle={toggle} setDialog={setDialog} deleteSubnet={deleteSubnet} deleteHost={deleteHost} indent="site" />
+                    <SubnetRow key={`subnet-${subnetNode.subnet.id}`} subnetNode={subnetNode} expanded={expanded} toggle={toggle} setDialog={setDialog} deleteSubnet={deleteSubnet} deleteHost={deleteHost} deleteDhcpPool={deleteDhcpPool} indent="site" />
                   ))}
                 </TreeFragment>
               )
@@ -505,6 +524,15 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
           />
         </Dialog>
       )}
+      {dialog?.type === 'dhcpPool' && (
+        <Dialog open onOpenChange={closeDialog} title={dialog.mode === 'edit' ? 'Edit DHCP Pool' : 'Add DHCP Pool'}>
+          <DHCPPoolForm
+            subnetId={dialog.mode === 'edit' ? (dialog.entity as DHCPPool).subnet : dialog.parentId!}
+            pool={dialog.mode === 'edit' ? (dialog.entity as DHCPPool) : undefined}
+            onClose={closeDialog}
+          />
+        </Dialog>
+      )}
     </>
   )
 }
@@ -512,20 +540,33 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
 // ─── SubnetRow (shared between VLAN-attached and standalone) ──
 
 function SubnetRow({
-  subnetNode, expanded, toggle, setDialog, deleteSubnet, deleteHost, indent,
+  subnetNode, expanded, toggle, setDialog, deleteSubnet, deleteHost, deleteDhcpPool, indent,
 }: {
   subnetNode: SubnetNode
   expanded: Set<string>
   toggle: (key: string) => void
-  setDialog: (d: { type: 'host' | 'subnet'; mode: 'add' | 'edit'; parentId?: number; entity?: Subnet | Host } | null) => void
+  setDialog: (d: { type: 'host' | 'subnet' | 'dhcpPool'; mode: 'add' | 'edit'; parentId?: number; entity?: Subnet | Host | DHCPPool } | null) => void
   deleteSubnet: { mutate: (id: number) => void }
   deleteHost: { mutate: (id: number) => void }
+  deleteDhcpPool: { mutate: (id: number) => void }
   indent: 'vlan' | 'site'
 }) {
   const subKey = `subnet-${subnetNode.subnet.id}`
   const subOpen = expanded.has(subKey)
   const pl = indent === 'vlan' ? 'pl-10 md:pl-14' : 'pl-6 md:pl-8'
-  const hostPl = indent === 'vlan' ? 'pl-14 md:pl-20' : 'pl-10 md:pl-14'
+  const childPl = indent === 'vlan' ? 'pl-14 md:pl-20' : 'pl-10 md:pl-14'
+  const leasePl = indent === 'vlan' ? 'pl-[72px] md:pl-24' : 'pl-14 md:pl-[72px]'
+
+  // Split hosts: static directly under subnet, leases under their pools
+  const staticHosts = subnetNode.hosts.filter((h) => h.ip_type !== 'dhcp_lease')
+  const leasesByPool = new Map<number, Host[]>()
+  for (const h of subnetNode.hosts) {
+    if (h.ip_type === 'dhcp_lease' && h.dhcp_pool) {
+      const arr = leasesByPool.get(h.dhcp_pool) ?? []
+      arr.push(h)
+      leasesByPool.set(h.dhcp_pool, arr)
+    }
+  }
 
   return (
     <TreeFragment>
@@ -548,6 +589,9 @@ function SubnetRow({
             <button onClick={() => setDialog({ type: 'host', mode: 'add', parentId: subnetNode.subnet.id })} className="p-1 rounded hover:bg-accent" title="Add host">
               <Plus className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
+            <button onClick={() => setDialog({ type: 'dhcpPool', mode: 'add', parentId: subnetNode.subnet.id })} className="p-1 rounded hover:bg-accent" title="Add DHCP pool">
+              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
             <button onClick={() => setDialog({ type: 'subnet', mode: 'edit', entity: subnetNode.subnet })} className="p-1 rounded hover:bg-accent" title="Edit subnet">
               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
@@ -558,10 +602,10 @@ function SubnetRow({
         </td>
       </tr>
 
-      {/* Host rows */}
-      {subOpen && subnetNode.hosts.map((host) => (
+      {/* Static host rows */}
+      {subOpen && staticHosts.map((host) => (
         <tr key={host.id} className="border-b border-border hover:bg-accent/20">
-          <td className={cn('px-2 md:px-3 py-1.5', hostPl)}>
+          <td className={cn('px-2 md:px-3 py-1.5', childPl)}>
             <span className="flex items-center gap-1.5 text-sm">
               <Server className="h-3 w-3 text-orange-500" />
               <CopyableIP ip={host.ip_address} />
@@ -589,6 +633,78 @@ function SubnetRow({
           </td>
         </tr>
       ))}
+
+      {/* DHCP Pool rows */}
+      {subOpen && subnetNode.dhcpPools.map((pool) => {
+        const poolKey = `pool-${pool.id}`
+        const poolOpen = expanded.has(poolKey)
+        const poolLeases = leasesByPool.get(pool.id) ?? []
+
+        return (
+          <TreeFragment key={poolKey}>
+            <tr className="border-b border-border hover:bg-accent/20 bg-blue-500/5">
+              <td className={cn('px-2 md:px-3 py-1.5', childPl)}>
+                <button onClick={() => toggle(poolKey)} className="flex items-center gap-1.5 text-sm">
+                  {poolOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                  <Layers className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="font-mono text-xs">
+                    {pool.start_ip.split('/')[0]}&ndash;{pool.end_ip.split('/')[0]}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    ({poolLeases.length} leases)
+                  </span>
+                </button>
+              </td>
+              <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
+                {pool.description || 'DHCP Pool'}
+              </td>
+              <td className="px-2 md:px-3 py-1.5 hidden md:table-cell"></td>
+              <td className="px-2 md:px-3 py-1.5">
+                <div className="flex justify-end gap-0.5">
+                  <button onClick={() => setDialog({ type: 'dhcpPool', mode: 'edit', entity: pool })} className="p-1 rounded hover:bg-accent" title="Edit pool">
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => { if (window.confirm('Delete this DHCP pool?')) deleteDhcpPool.mutate(pool.id) }} className="p-1 rounded hover:bg-destructive/20" title="Delete pool">
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            {/* Lease rows inside pool */}
+            {poolOpen && poolLeases.map((host) => (
+              <tr key={host.id} className="border-b border-border hover:bg-accent/20">
+                <td className={cn('px-2 md:px-3 py-1.5', leasePl)}>
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <Server className="h-3 w-3 text-orange-500" />
+                    <CopyableIP ip={host.ip_address} />
+                    {host.hostname && (
+                      <span className="text-muted-foreground hidden sm:inline">({host.hostname})</span>
+                    )}
+                  </span>
+                </td>
+                <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
+                  {host.device_type}
+                  {host.mac_address && ` · ${host.mac_address}`}
+                </td>
+                <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden md:table-cell">
+                  DHCP Lease
+                </td>
+                <td className="px-2 md:px-3 py-1.5">
+                  <div className="flex justify-end gap-0.5">
+                    <button onClick={() => setDialog({ type: 'host', mode: 'edit', entity: host })} className="p-1 rounded hover:bg-accent" title="Edit host">
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                    <button onClick={() => { if (window.confirm(`Delete host "${host.hostname || host.ip_address}"?`)) deleteHost.mutate(host.id) }} className="p-1 rounded hover:bg-destructive/20" title="Delete host">
+                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </TreeFragment>
+        )
+      })}
     </TreeFragment>
   )
 }
