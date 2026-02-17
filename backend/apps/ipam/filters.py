@@ -1,6 +1,6 @@
 import django_filters
 
-from .models import Host, Subnet, Tunnel, VLAN
+from .models import Host, Subnet, Tunnel, VLAN, DHCPPool
 
 
 class VLANFilter(django_filters.FilterSet):
@@ -43,8 +43,19 @@ class HostFilter(django_filters.FilterSet):
     site = django_filters.NumberFilter(field_name="subnet__site_id")
     vlan = django_filters.NumberFilter(field_name="subnet__vlan_id")
     subnet = django_filters.NumberFilter(field_name="subnet_id")
+    dhcp_pool = django_filters.NumberFilter(field_name="dhcp_pool_id")
     device_type = django_filters.ChoiceFilter(choices=Host.DeviceType.choices)
 
     class Meta:
         model = Host
-        fields = ["project", "site", "vlan", "subnet", "device_type"]
+        fields = ["project", "site", "vlan", "subnet", "dhcp_pool", "device_type"]
+
+
+class DHCPPoolFilter(django_filters.FilterSet):
+    project = django_filters.NumberFilter(field_name="subnet__project_id")
+    site = django_filters.NumberFilter(field_name="subnet__site_id")
+    subnet = django_filters.NumberFilter(field_name="subnet_id")
+
+    class Meta:
+        model = DHCPPool
+        fields = ["project", "site", "subnet"]

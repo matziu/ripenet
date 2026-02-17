@@ -6,10 +6,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .filters import HostFilter, SubnetFilter, TunnelFilter, VLANFilter
-from .models import VLAN, Host, Subnet, Tunnel
+from .filters import HostFilter, SubnetFilter, TunnelFilter, VLANFilter, DHCPPoolFilter
+from .models import VLAN, Host, Subnet, Tunnel, DHCPPool
 from .permissions import ProjectPermission
-from .serializers import HostSerializer, SubnetSerializer, TunnelSerializer, VLANSerializer
+from .serializers import HostSerializer, SubnetSerializer, TunnelSerializer, VLANSerializer, DHCPPoolSerializer
 
 
 class VLANViewSet(viewsets.ModelViewSet):
@@ -74,6 +74,26 @@ class HostViewSet(viewsets.ModelViewSet):
         return Host.objects.select_related(
             "subnet", "subnet__project", "subnet__site", "subnet__vlan"
         )
+
+
+class DHCPPoolViewSet(viewsets.ModelViewSet):
+    serializer_class = DHCPPoolSerializer
+    permission_classes = [ProjectPermission]
+    filterset_class = DHCPPoolFilter
+
+    def get_queryset(self):
+        return DHCPPool.objects.annotate(
+            lease_count=Count("leases", distinct=True),
+        ).select_related("subnet", "subnet__project", "subnet__site")
+
+    def destroy(self, request, *args, **kwargs):
+        pool = self.get_object()
+        if pool.leases.exists():
+            return Response(
+                {"detail": "Cannot delete pool with existing leases. Remove leases first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class TunnelViewSet(viewsets.ModelViewSet):

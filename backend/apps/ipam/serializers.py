@@ -2,8 +2,11 @@ from rest_framework import serializers
 
 from apps.projects.models import Project, Site
 from apps.projects.serializers import SiteWanAddressSerializer
-from .models import VLAN, Host, Subnet, Tunnel
-from .validators import check_ip_duplicate_in_project, check_ip_in_subnet, check_subnet_overlap
+from .models import VLAN, Host, Subnet, Tunnel, DHCPPool
+from .validators import (
+    check_ip_duplicate_in_project, check_ip_in_subnet, check_subnet_overlap,
+    check_pool_range_in_subnet, check_pool_overlap, check_static_ip_not_in_pool, check_lease_ip_in_pool,
+)
 
 
 class HostSerializer(serializers.ModelSerializer):
@@ -11,19 +14,68 @@ class HostSerializer(serializers.ModelSerializer):
         model = Host
         fields = [
             "id", "subnet", "ip_address", "hostname", "mac_address",
-            "device_type", "description", "created_at", "updated_at",
+            "device_type", "ip_type", "dhcp_pool",
+            "description", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
         subnet = attrs.get("subnet") or (self.instance and self.instance.subnet)
         ip_address = attrs.get("ip_address") or (self.instance and self.instance.ip_address)
+        ip_type = attrs.get("ip_type") or (self.instance and self.instance.ip_type) or "static"
+        dhcp_pool = attrs.get("dhcp_pool") or (self.instance and self.instance.dhcp_pool)
 
         if ip_address and subnet:
             check_ip_in_subnet(ip_address, subnet.network)
             project = subnet.project
             check_ip_duplicate_in_project(
                 ip_address, project,
+                exclude_pk=self.instance.pk if self.instance else None,
+            )
+
+        # DHCP-specific validation
+        if ip_type == "static":
+            if dhcp_pool:
+                raise serializers.ValidationError(
+                    {"dhcp_pool": "Static IP hosts cannot have a DHCP pool."}
+                )
+            if ip_address and subnet:
+                check_static_ip_not_in_pool(ip_address, subnet)
+        elif ip_type == "dhcp_lease":
+            if not dhcp_pool:
+                raise serializers.ValidationError(
+                    {"dhcp_pool": "DHCP lease hosts must have a DHCP pool."}
+                )
+            if dhcp_pool.subnet_id != subnet.id:
+                raise serializers.ValidationError(
+                    {"dhcp_pool": "DHCP pool must belong to the same subnet as the host."}
+                )
+            if ip_address and dhcp_pool:
+                check_lease_ip_in_pool(ip_address, dhcp_pool)
+
+        return attrs
+
+
+class DHCPPoolSerializer(serializers.ModelSerializer):
+    lease_count = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = DHCPPool
+        fields = [
+            "id", "subnet", "start_ip", "end_ip", "description",
+            "lease_count", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        subnet = attrs.get("subnet") or (self.instance and self.instance.subnet)
+        start_ip = attrs.get("start_ip") or (self.instance and self.instance.start_ip)
+        end_ip = attrs.get("end_ip") or (self.instance and self.instance.end_ip)
+
+        if start_ip and end_ip and subnet:
+            check_pool_range_in_subnet(start_ip, end_ip, subnet.network)
+            check_pool_overlap(
+                start_ip, end_ip, subnet,
                 exclude_pk=self.instance.pk if self.instance else None,
             )
 
