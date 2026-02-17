@@ -22,6 +22,23 @@ Web application for managing IP address infrastructure: projects, sites, VLANs, 
 - Role-based access: admin / editor / viewer
 - Dark mode
 
+## Screenshots
+
+### Table view (light)
+![Table view](docs/screenshots/table-view-light.png)
+
+### Topology view (light)
+![Topology view](docs/screenshots/topology-light.png)
+
+### Table view (dark)
+![Table view dark](docs/screenshots/table-view-dark.png)
+
+### Detail panel (dark)
+![Detail panel dark](docs/screenshots/detail-panel-dark.png)
+
+### Topology view (dark)
+![Topology view dark](docs/screenshots/topology-dark.png)
+
 ## Requirements
 
 - [Docker](https://docs.docker.com/get-docker/) (includes Docker Compose)
