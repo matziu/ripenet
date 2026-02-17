@@ -120,7 +120,7 @@ This runs:
 | `POSTGRES_DB` | Database name | `ripenet` |
 | `POSTGRES_USER` | Database user | `ripenet` |
 | `POSTGRES_PASSWORD` | Database password | `ripenet` |
-| `DJANGO_SECRET_KEY` | Django secret key | `change-me-in-production` |
+| `DJANGO_SECRET_KEY` | Django secret key | `change-me-to-a-random-string` |
 | `DJANGO_ADMIN_PASSWORD` | Initial admin password | `admin` |
 
 ## Project Structure
@@ -134,14 +134,17 @@ backend/
     ipam/        # VLANs, subnets, hosts, DHCP pools, tunnels
     projects/    # Projects, sites, topology endpoint
     search/      # Global search
+    templates/   # Project templates (pre-configured network layouts)
   config/        # Django settings, root URLs
 frontend/
   src/
     api/         # Axios client, API endpoints
     components/  # UI components, forms, layout
+    hooks/       # React Query hooks (queries, mutations)
     lib/         # Utilities, topology graph logic
     pages/       # Route pages
     stores/      # Zustand stores (UI, selection, topology)
+    types/       # TypeScript interfaces
 docker/
   Dockerfile.backend
   Dockerfile.frontend
@@ -154,11 +157,14 @@ docker/
 
 REST API at `/api/v1/` with endpoints:
 
+- `/auth/login/`, `/auth/logout/`, `/auth/me/`
 - `/projects/`, `/projects/{id}/sites/`, `/projects/{id}/topology/`
 - `/vlans/`, `/subnets/`, `/hosts/`, `/dhcp-pools/`, `/tunnels/`
 - `/subnets/{id}/next-free-ip/`, `/subnets/{id}/suggested-pool-range/`
 - `/tools/subnet-info/`, `/tools/vlsm/`
 - `/search/?q=...`
+- `/audit/` (change log)
+- `/exports/project/{id}/pdf/`, `/exports/project/{id}/excel/`
 - `/users/` (admin only)
 
 ## License
