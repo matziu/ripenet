@@ -562,7 +562,7 @@ function DHCPPoolDetail({ poolId }: { poolId: number }) {
       <div>
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-xs font-semibold uppercase text-muted-foreground">
-            Leases
+            Leases ({hosts.length})
           </h4>
           <button
             onClick={() => setAddHostOpen(true)}
