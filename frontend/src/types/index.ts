@@ -152,6 +152,7 @@ export interface SiteTopology {
 
 export interface TunnelTopology {
   id: number
+  project: number
   name: string
   tunnel_type: TunnelType
   tunnel_subnet: string

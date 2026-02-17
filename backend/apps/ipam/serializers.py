@@ -181,7 +181,7 @@ class TunnelTopologySerializer(serializers.ModelSerializer):
     class Meta:
         model = Tunnel
         fields = [
-            "id", "name", "tunnel_type", "tunnel_subnet",
+            "id", "project", "name", "tunnel_type", "tunnel_subnet",
             "site_a", "site_a_name", "ip_a",
             "site_b", "site_b_name", "site_b_project_id", "site_b_project_name",
             "site_b_latitude", "site_b_longitude", "ip_b",

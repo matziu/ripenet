@@ -138,16 +138,15 @@ function TopologyCanvasInner({ projectId }: TopologyCanvasProps) {
     select: (res) => res.data,
   })
 
-  const savedPositions = useMemo(
-    () => (layoutKey === 0 ? loadPositions(projectId) : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projectId, layoutKey],
-  )
-
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!topology) return { nodes: [], edges: [] }
-    return topologyToFlow(topology, expandedSites, savedPositions)
-  }, [topology, expandedSites, savedPositions])
+    // Always load fresh positions from localStorage
+    // After "Re-layout" clearPositions() was called, so loadPositions returns undefined → triggers dagre
+    const positions = loadPositions(projectId)
+    return topologyToFlow(topology, expandedSites, positions)
+    // layoutKey dependency: re-triggers after "Re-layout" button clears positions
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topology, expandedSites, projectId, layoutKey])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -155,7 +154,12 @@ function TopologyCanvasInner({ projectId }: TopologyCanvasProps) {
   useEffect(() => {
     setNodes(initialNodes)
     setEdges(initialEdges)
-  }, [initialNodes, initialEdges, setNodes, setEdges])
+    // Persist positions after every layout computation (dagre or position restore)
+    // so that expand/collapse doesn't lose the current arrangement
+    if (initialNodes.length > 0) {
+      savePositions(projectId, initialNodes)
+    }
+  }, [initialNodes, initialEdges, setNodes, setEdges, projectId])
 
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {

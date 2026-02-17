@@ -1,16 +1,17 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
+import { useNavigate } from 'react-router-dom'
 import type { SiteNodeData, VlanEmbedded } from '@/lib/topology.utils'
 import { getVlanColor } from '@/lib/topology.utils'
 import { useTopologyStore } from '@/stores/topology.store'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
-import { Building2, ChevronDown, ChevronRight, Globe, Network } from 'lucide-react'
+import { Building2, ChevronRight, Globe, Network, Cloud, ExternalLink } from 'lucide-react'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { cn } from '@/lib/utils'
 
-function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
+function VlanRow({ vlan, index }: { vlan: VlanEmbedded; index: number }) {
   const setSelectedVlan = useTopologyStore((s) => s.setSelectedVlan)
   const setSelectionVlan = useSelectionStore((s) => s.setSelectedVlan)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
@@ -30,13 +31,16 @@ function VlanRow({ vlan }: { vlan: VlanEmbedded }) {
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-all duration-150',
+        'flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer',
+        'transition-all duration-150',
+        index >= 0 && 'opacity-0 animate-[vlan-slide-in_0.25s_ease-out_forwards]',
         color.bg,
         color.border,
         'border',
         isHighlighted && 'ring-2 ring-primary/40 shadow-sm',
         'hover:brightness-95 dark:hover:brightness-110',
       )}
+      style={index >= 0 ? { animationDelay: `${index * 30}ms` } : undefined}
       onClick={handleClick}
     >
       <div className={cn('w-2 h-2 rounded-full shrink-0', color.dot)} />
@@ -71,21 +75,64 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
   const highlightedNodeId = useTopologyStore((s) => s.highlightedNodeId)
   const isHighlighted = highlightedNodeId === id
 
+  const navigate = useNavigate()
+  const isVirtual = d.isExternal || d.isCrossProject
+
+  // Cache vlans/subnets for collapse animation (so content stays visible during grid-rows transition)
+  const cachedVlansRef = useRef(d.vlans)
+  const cachedStandaloneRef = useRef(d.standaloneSubnets)
+  if (d.vlans.length > 0) {
+    cachedVlansRef.current = d.vlans
+    cachedStandaloneRef.current = d.standaloneSubnets
+  }
+  const displayVlans = d.expanded ? d.vlans : cachedVlansRef.current
+  const displayStandalone = d.expanded ? d.standaloneSubnets : cachedStandaloneRef.current
+  const hasContent = (displayVlans?.length ?? 0) > 0 || (displayStandalone?.length ?? 0) > 0
+
   const handleSiteClick = () => {
+    if (d.isCrossProject && d.crossProjectId) {
+      navigate(`/projects/${d.crossProjectId}/topology`)
+      return
+    }
+    if (d.isExternal) return
     toggleExpandedSite(d.siteId)
     setSelectedSite(d.siteId)
     if (!expandedSiteIds.has(d.siteId)) expandSite(d.siteId)
     if (!detailPanelOpen) toggleDetailPanel()
   }
 
+  // Pick icon and color scheme based on node type
+  const NodeIcon = d.isExternal ? ExternalLink : d.isCrossProject ? Cloud : Building2
+  const gradientClasses = d.isExternal
+    ? 'from-orange-500/10 via-orange-500/5 to-transparent dark:from-orange-500/20 dark:via-orange-500/10 dark:to-transparent'
+    : d.isCrossProject
+      ? 'from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-500/20 dark:via-amber-500/10 dark:to-transparent'
+      : 'from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent'
+  const iconBgClasses = d.isExternal
+    ? 'bg-orange-500/15 dark:bg-orange-500/25'
+    : d.isCrossProject
+      ? 'bg-amber-500/15 dark:bg-amber-500/25'
+      : 'bg-primary/10 dark:bg-primary/20'
+  const iconColorClass = d.isExternal
+    ? 'text-orange-500'
+    : d.isCrossProject
+      ? 'text-amber-500'
+      : 'text-primary'
+  const borderClasses = d.isExternal
+    ? 'border-orange-500/40 hover:border-orange-500/60'
+    : d.isCrossProject
+      ? 'border-amber-500/40 hover:border-amber-500/60'
+      : 'border-border/60 hover:border-primary/40 hover:shadow-lg'
+
   return (
     <div
       className={cn(
-        'rounded-xl border bg-card shadow-md transition-all duration-200',
-        d.expanded ? 'min-w-[280px]' : 'min-w-[200px]',
+        'w-[260px] rounded-xl border bg-card shadow-md',
+        'transition-[border-color,box-shadow] duration-200',
+        isVirtual && 'border-dashed',
         isHighlighted
           ? 'border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/10'
-          : 'border-border/60 hover:border-primary/40 hover:shadow-lg',
+          : borderClasses,
       )}
     >
       <Handle type="target" id="target-top" position={Position.Top} className="!w-1.5 !h-1.5 !opacity-0" />
@@ -96,35 +143,60 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
       {/* Site header with gradient */}
       <div
         className={cn(
-          'flex items-center gap-3 px-4 py-3 cursor-pointer rounded-t-xl',
-          'bg-gradient-to-r from-primary/5 via-primary/3 to-transparent',
-          'dark:from-primary/10 dark:via-primary/5 dark:to-transparent',
+          'flex items-center gap-3 px-4 py-3 rounded-t-xl',
+          d.isExternal ? 'cursor-default' : 'cursor-pointer',
+          'bg-gradient-to-r',
+          gradientClasses,
+          'group',
         )}
         onClick={handleSiteClick}
       >
         <div className={cn(
-          'flex items-center justify-center h-8 w-8 rounded-lg shrink-0 transition-colors duration-200',
-          'bg-primary/10 dark:bg-primary/20',
-          isHighlighted && 'bg-primary/20 dark:bg-primary/30',
+          'flex items-center justify-center h-8 w-8 rounded-lg shrink-0',
+          'transition-all duration-200',
+          iconBgClasses,
+          isHighlighted && 'brightness-110',
+          !isVirtual && 'group-hover:scale-110',
         )}>
-          <Building2 className="h-4 w-4 text-primary" />
+          <NodeIcon className={cn('h-4 w-4 transition-colors duration-200', iconColorClass)} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-sm truncate">{d.label}</span>
-            {d.expanded ? (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200" />
+            {d.isExternal && (
+              <span className="shrink-0 rounded px-1 py-0.5 text-[8px] font-bold uppercase bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+                EXT
+              </span>
+            )}
+            {d.isCrossProject && (
+              <span className="shrink-0 rounded px-1 py-0.5 text-[8px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                XP
+              </span>
+            )}
+            {!isVirtual && (
+              <ChevronRight
+                className={cn(
+                  'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-300 ease-out',
+                  d.expanded && 'rotate-90',
+                )}
+              />
             )}
           </div>
-          <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
-            <span className="flex items-center gap-0.5">
-              <Network className="h-3 w-3" />
-              {d.vlanCount}
-            </span>
-            <span>{d.hostCount} hosts</span>
-          </div>
+          {!isVirtual && (
+            <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
+              <span className="flex items-center gap-0.5">
+                <Network className="h-3 w-3" />
+                {d.vlanCount}
+              </span>
+              <span>{d.hostCount} hosts</span>
+            </div>
+          )}
+          {d.isExternal && (
+            <div className="text-[10px] text-orange-500/70 mt-0.5">External endpoint</div>
+          )}
+          {d.isCrossProject && (
+            <div className="text-[10px] text-amber-500/70 mt-0.5">Cross-project site</div>
+          )}
         </div>
       </div>
 
@@ -141,31 +213,46 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
         </div>
       )}
 
-      {/* Expanded VLANs + Standalone Subnets */}
-      {d.expanded && (d.vlans.length > 0 || (d.standaloneSubnets?.length ?? 0) > 0) && (
-        <div className="px-3 pb-3 space-y-1 border-t border-border/30 pt-2 mt-0.5">
-          {d.vlans.map((vlan) => (
-            <VlanRow key={vlan.id} vlan={vlan} />
-          ))}
-          {d.standaloneSubnets && d.standaloneSubnets.length > 0 && (
-            <>
-              {d.vlans.length > 0 && (
-                <div className="text-[9px] uppercase tracking-wider text-muted-foreground/60 pt-1">
-                  Standalone
-                </div>
-              )}
-              {d.standaloneSubnets.map((sub, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 rounded-md px-2 py-1 bg-gray-500/10 border border-gray-500/20"
-                >
-                  <div className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
-                  <span className="text-[11px] font-mono text-muted-foreground">{sub.network}</span>
-                  <SubnetUtilBar network={sub.network} hostCount={sub.hostCount} className="ml-auto" />
-                </div>
+      {/* Animated expand/collapse using CSS grid-template-rows */}
+      {hasContent && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateRows: d.expanded ? '1fr' : '0fr',
+            opacity: d.expanded ? 1 : 0,
+            transition: 'grid-template-rows 300ms cubic-bezier(0.4,0,0.2,1), opacity 250ms ease',
+          }}
+        >
+          <div style={{ overflow: 'hidden' }}>
+            <div className="px-3 pb-3 space-y-1 border-t border-border/30 pt-2 mt-0.5">
+              {displayVlans.map((vlan, i) => (
+                <VlanRow key={vlan.id} vlan={vlan} index={d.expanded ? i : -1} />
               ))}
-            </>
-          )}
+              {displayStandalone && displayStandalone.length > 0 && (
+                <>
+                  {displayVlans.length > 0 && (
+                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground/60 pt-1">
+                      Standalone
+                    </div>
+                  )}
+                  {displayStandalone.map((sub, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'flex items-center gap-2 rounded-md px-2 py-1 bg-gray-500/10 border border-gray-500/20',
+                        d.expanded && 'opacity-0 animate-[vlan-slide-in_0.25s_ease-out_forwards]',
+                      )}
+                      style={d.expanded ? { animationDelay: `${(displayVlans.length + i) * 30}ms` } : undefined}
+                    >
+                      <div className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
+                      <span className="text-[11px] font-mono text-muted-foreground">{sub.network}</span>
+                      <SubnetUtilBar network={sub.network} hostCount={sub.hostCount} className="ml-auto" />
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
