@@ -73,7 +73,7 @@ class DHCPPoolSerializer(serializers.ModelSerializer):
         end_ip = attrs.get("end_ip") or (self.instance and self.instance.end_ip)
 
         if start_ip and end_ip and subnet:
-            check_pool_range_in_subnet(start_ip, end_ip, subnet.network)
+            check_pool_range_in_subnet(start_ip, end_ip, subnet.network, gateway=subnet.gateway)
             check_pool_overlap(
                 start_ip, end_ip, subnet,
                 exclude_pk=self.instance.pk if self.instance else None,

@@ -72,8 +72,8 @@ def check_ip_in_subnet(ip_address, subnet_network):
         )
 
 
-def check_pool_range_in_subnet(start_ip, end_ip, subnet_network):
-    """Validate that start_ip and end_ip both fall within subnet_network, and start < end."""
+def check_pool_range_in_subnet(start_ip, end_ip, subnet_network, gateway=None):
+    """Validate that the pool range is within usable host range and doesn't include gateway."""
     start = ipaddress.ip_address(str(start_ip).split("/")[0])
     end = ipaddress.ip_address(str(end_ip).split("/")[0])
     net = ipaddress.ip_network(str(subnet_network), strict=False)
@@ -84,6 +84,26 @@ def check_pool_range_in_subnet(start_ip, end_ip, subnet_network):
         raise ValidationError(f"End IP {end_ip} is not within subnet {subnet_network}")
     if start >= end:
         raise ValidationError(f"Start IP must be less than End IP ({start_ip} >= {end_ip})")
+
+    # Exclude network and broadcast addresses (for prefixes < /31)
+    if net.prefixlen < 31:
+        if start == net.network_address:
+            raise ValidationError(
+                f"Pool cannot include network address {net.network_address}"
+            )
+        if end == net.broadcast_address:
+            raise ValidationError(
+                f"Pool cannot include broadcast address {net.broadcast_address}"
+            )
+
+    # Exclude gateway
+    if gateway:
+        gw = ipaddress.ip_address(str(gateway).split("/")[0])
+        if int(start) <= int(gw) <= int(end):
+            raise ValidationError(
+                f"Pool range includes gateway address {gw}. "
+                f"Adjust the range to exclude the gateway."
+            )
 
 
 def check_pool_overlap(start_ip, end_ip, subnet, exclude_pk=None):
