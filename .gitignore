@@ -48,6 +48,10 @@ test-e2e-standalone.mjs
 # Test artifacts
 frontend/test-screenshots/
 frontend/test-results/
+test-results/
+
+# Working docs
+docs/plans/
 
 # Root-level Playwright deps
 /package.json
