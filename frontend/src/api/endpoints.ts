@@ -1,5 +1,5 @@
 import type {
-  Project, Site, VLAN, Subnet, Host, Tunnel,
+  Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool,
   ProjectTopology, SearchResult, PaginatedResponse, AuditLog, User, UserAdmin,
 } from '@/types'
 import apiClient from './client'
@@ -84,6 +84,20 @@ export const hostsApi = {
     apiClient.patch<Host>(`/hosts/${id}/`, data),
   delete: (id: number) =>
     apiClient.delete(`/hosts/${id}/`),
+}
+
+// DHCP Pools
+export const dhcpPoolsApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<PaginatedResponse<DHCPPool>>('/dhcp-pools/', { params }),
+  get: (id: number) =>
+    apiClient.get<DHCPPool>(`/dhcp-pools/${id}/`),
+  create: (data: Partial<DHCPPool>) =>
+    apiClient.post<DHCPPool>('/dhcp-pools/', data),
+  update: (id: number, data: Partial<DHCPPool>) =>
+    apiClient.patch<DHCPPool>(`/dhcp-pools/${id}/`, data),
+  delete: (id: number) =>
+    apiClient.delete(`/dhcp-pools/${id}/`),
 }
 
 // Tunnels

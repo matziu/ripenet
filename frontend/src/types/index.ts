@@ -87,7 +87,20 @@ export interface Host {
   hostname: string
   mac_address: string
   device_type: DeviceType
+  ip_type: 'static' | 'dhcp_lease'
+  dhcp_pool: number | null
   description: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DHCPPool {
+  id: number
+  subnet: number
+  start_ip: string
+  end_ip: string
+  description: string
+  lease_count: number
   created_at: string
   updated_at: string
 }
@@ -121,6 +134,16 @@ export interface HostTopology {
   ip_address: string
   hostname: string
   device_type: DeviceType
+  ip_type: 'static' | 'dhcp_lease'
+  dhcp_pool: number | null
+}
+
+export interface DHCPPoolTopology {
+  id: number
+  start_ip: string
+  end_ip: string
+  description: string
+  leases: HostTopology[]
 }
 
 export interface SubnetTopology {
@@ -129,6 +152,7 @@ export interface SubnetTopology {
   gateway: string | null
   description: string
   hosts: HostTopology[]
+  dhcp_pools: DHCPPoolTopology[]
 }
 
 export interface VLANTopology {
