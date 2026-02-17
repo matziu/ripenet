@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { projectsApi, sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi } from '@/api/endpoints'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 import { Dialog } from '@/components/ui/Dialog'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { SiteForm } from '@/components/data/forms/SiteForm'
@@ -732,7 +732,7 @@ function HostTreeItem({ host, subnetId }: { host: Host; subnetId: number }) {
   const handleClick = () => {
     setSelectedHost(host.id)
     if (!detailPanelOpen) toggleDetailPanel()
-    navigator.clipboard.writeText(displayIp).then(() => {
+    copyToClipboard(displayIp).then(() => {
       toast.success(`Copied ${displayIp}`)
     })
     closeMobile()

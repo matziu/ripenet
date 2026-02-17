@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Copy, Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 
 interface CopyableIPProps {
   ip: string
@@ -15,19 +15,7 @@ export function CopyableIP({ ip, className }: CopyableIPProps) {
     e.stopPropagation()
     const bare = ip.split('/')[0]
     try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(bare)
-      } else {
-        // Fallback for non-HTTPS contexts
-        const textarea = document.createElement('textarea')
-        textarea.value = bare
-        textarea.style.position = 'fixed'
-        textarea.style.opacity = '0'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-      }
+      await copyToClipboard(bare)
       setCopied(true)
       toast.success(`Copied: ${bare}`)
       setTimeout(() => setCopied(false), 2000)
