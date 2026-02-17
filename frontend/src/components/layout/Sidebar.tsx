@@ -727,18 +727,15 @@ function HostTreeItem({ host, subnetId }: { host: Host; subnetId: number }) {
     },
   })
 
+  const displayIp = host.ip_address.replace(/\/32$/, '')
+
   const handleClick = () => {
     setSelectedHost(host.id)
     if (!detailPanelOpen) toggleDetailPanel()
+    navigator.clipboard.writeText(displayIp).then(() => {
+      toast.success(`Copied ${displayIp}`)
+    })
     closeMobile()
-  }
-
-  const displayIp = host.ip_address.replace(/\/32$/, '')
-
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.preventDefault()
-    navigator.clipboard.writeText(displayIp)
-    toast.success(`Copied ${displayIp}`)
   }
 
   return (
@@ -746,7 +743,6 @@ function HostTreeItem({ host, subnetId }: { host: Host; subnetId: number }) {
       <div className="group flex items-center">
         <button
           onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
           className={cn(
             'flex flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors min-w-0',
             isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
