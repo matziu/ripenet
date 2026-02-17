@@ -43,6 +43,29 @@ export function AppShell() {
     [sidebarWidth, setSidebarWidth],
   )
 
+  const onTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      dragging.current = true
+      const startX = e.touches[0].clientX
+      const startW = sidebarWidth
+
+      const onTouchMove = (ev: TouchEvent) => {
+        if (!dragging.current) return
+        setSidebarWidth(startW + (ev.touches[0].clientX - startX))
+      }
+
+      const onTouchEnd = () => {
+        dragging.current = false
+        document.removeEventListener('touchmove', onTouchMove)
+        document.removeEventListener('touchend', onTouchEnd)
+      }
+
+      document.addEventListener('touchmove', onTouchMove, { passive: true })
+      document.addEventListener('touchend', onTouchEnd)
+    },
+    [sidebarWidth, setSidebarWidth],
+  )
+
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <TopBar />
@@ -67,7 +90,8 @@ export function AppShell() {
           <Sidebar style={{ width: sidebarWidth, minWidth: sidebarWidth }} />
           <div
             onMouseDown={onMouseDown}
-            className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors"
+            onTouchStart={onTouchStart}
+            className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors touch-none"
           />
         </div>
 
