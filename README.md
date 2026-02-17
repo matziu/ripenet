@@ -22,24 +22,47 @@ Web application for managing IP address infrastructure: projects, sites, VLANs, 
 - Role-based access: admin / editor / viewer
 - Dark mode
 
-## Quick Start
+## Requirements
 
-Requirements: Docker and Docker Compose.
+- [Docker](https://docs.docker.com/get-docker/) (includes Docker Compose)
+- [Node.js](https://nodejs.org/) 18+ and npm (for frontend development)
+
+## Quick Start (step by step)
+
+### 1. Clone the repository
 
 ```bash
-# Clone and start
 git clone https://github.com/matziu/ripenet.git
 cd ripenet
+```
+
+### 2. Create the environment file
+
+Copy the example file and adjust values if needed:
+
+```bash
+cp .env.example .env
+```
+
+The `.env` file contains database credentials and the admin password. Default values work out of the box for local development - you only need to change them for production.
+
+### 3. Start the backend services
+
+```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-This will:
-- Start PostgreSQL 16 + Redis
-- Run migrations and create an admin user
-- Load sample seed data
-- Start the Django dev server on port 8000
+Wait until you see `Starting development server at http://0.0.0.0:8000` in the output. On first run this will:
+- Download Docker images (~1 min)
+- Build the backend container
+- Start PostgreSQL and Redis
+- Run database migrations
+- Create an admin user
+- Load sample network data
 
-Then start the frontend:
+### 4. Start the frontend (new terminal)
+
+Open a **new terminal window** in the same directory and run:
 
 ```bash
 cd frontend
@@ -47,16 +70,41 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and log in:
+Wait until you see `Local: http://localhost:3000` in the output.
+
+### 5. Open the app
+
+Go to **http://localhost:3000** in your browser and log in:
 
 | Field    | Value   |
 |----------|---------|
 | Username | `admin` |
 | Password | `admin` |
 
+(or whatever you set as `DJANGO_ADMIN_PASSWORD` in your `.env` file)
+
+### Stopping the app
+
+- Frontend: press `Ctrl+C` in the frontend terminal
+- Backend: press `Ctrl+C` in the backend terminal, then run `docker compose -f docker-compose.dev.yml down`
+
+### Starting again (after first setup)
+
+You don't need to rebuild each time. Just run:
+
+```bash
+# Terminal 1 - backend
+docker compose -f docker-compose.dev.yml up
+
+# Terminal 2 - frontend
+cd frontend && npm run dev
+```
+
 ## Production
 
 ```bash
+cp .env.example .env
+# Edit .env - set a strong DJANGO_SECRET_KEY and POSTGRES_PASSWORD
 docker compose up --build -d
 ```
 
@@ -64,6 +112,16 @@ This runs:
 - Backend with Gunicorn behind Nginx
 - Frontend as a static build served by Nginx on port 3000
 - PostgreSQL and Redis
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `POSTGRES_DB` | Database name | `ripenet` |
+| `POSTGRES_USER` | Database user | `ripenet` |
+| `POSTGRES_PASSWORD` | Database password | `ripenet` |
+| `DJANGO_SECRET_KEY` | Django secret key | `change-me-in-production` |
+| `DJANGO_ADMIN_PASSWORD` | Initial admin password | `admin` |
 
 ## Project Structure
 

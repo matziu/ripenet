@@ -16,6 +16,9 @@ backend/media/
 backend/.env
 *.sqlite3
 
+# Environment
+.env
+
 # Node
 node_modules/
 frontend/dist/
