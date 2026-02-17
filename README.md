@@ -24,19 +24,22 @@ Web application for managing IP address infrastructure: projects, sites, VLANs, 
 
 ## Screenshots
 
-### Table view (light)
+### Dashboard
+![Dashboard](docs/screenshots/dashboard-light.png)
+
+### Table view
 ![Table view](docs/screenshots/table-view-light.png)
 
-### Topology view (light)
+### Topology view
 ![Topology view](docs/screenshots/topology-light.png)
 
-### Table view (dark)
-![Table view dark](docs/screenshots/table-view-dark.png)
-
-### Detail panel (dark)
+### Detail panel (dark mode)
 ![Detail panel dark](docs/screenshots/detail-panel-dark.png)
 
-### Topology view (dark)
+### Table view (dark mode)
+![Table view dark](docs/screenshots/table-view-dark.png)
+
+### Topology view (dark mode)
 ![Topology view dark](docs/screenshots/topology-dark.png)
 
 ## Requirements
