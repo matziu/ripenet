@@ -11,6 +11,7 @@ import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
 import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
+import { DHCPPoolForm } from '@/components/data/forms/DHCPPoolForm'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { ProjectForm } from '@/components/data/forms/ProjectForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
@@ -550,6 +551,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number })
 
   const [editOpen, setEditOpen] = useState(false)
   const [addHostOpen, setAddHostOpen] = useState(false)
+  const [addPoolOpen, setAddPoolOpen] = useState(false)
 
   const deleteMutation = useMutation({
     mutationFn: () => subnetsApi.delete(subnet.id),
@@ -616,6 +618,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number })
           <Plus className="h-3 w-3" />
         </button>
         <DropdownMenu items={[
+          { label: 'Add Pool', icon: <Layers className="h-3 w-3" />, onClick: () => setAddPoolOpen(true) },
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
           { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
             if (window.confirm(`Delete subnet ${subnet.network}?`)) deleteMutation.mutate()
@@ -646,6 +649,10 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number })
 
       <Dialog open={addHostOpen} onOpenChange={setAddHostOpen} title="Add Host">
         <HostForm subnetId={subnet.id} onClose={() => setAddHostOpen(false)} />
+      </Dialog>
+
+      <Dialog open={addPoolOpen} onOpenChange={setAddPoolOpen} title="Add DHCP Pool">
+        <DHCPPoolForm subnetId={subnet.id} onClose={() => setAddPoolOpen(false)} />
       </Dialog>
     </div>
   )
