@@ -56,6 +56,7 @@ function VlanRow({ vlan, index }: { vlan: VlanEmbedded; index: number }) {
             <SubnetUtilBar
               network={vlan.subnetDetails[0].network}
               hostCount={vlan.subnetDetails[0].hostCount}
+              dhcpPoolSize={vlan.subnetDetails[0].dhcpPoolSize}
             />
           )}
         </div>
@@ -266,7 +267,7 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
                     >
                       <div className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
                       <span className="text-[11px] font-mono text-muted-foreground">{sub.network}</span>
-                      <SubnetUtilBar network={sub.network} hostCount={sub.hostCount} className="ml-auto" />
+                      <SubnetUtilBar network={sub.network} hostCount={sub.hostCount} dhcpPoolSize={sub.dhcpPoolSize} className="ml-auto" />
                     </div>
                   ))}
                 </>

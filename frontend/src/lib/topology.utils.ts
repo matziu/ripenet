@@ -47,6 +47,11 @@ const VLAN_INDEX_COLORS = [
   { bg: 'bg-fuchsia-400/10', border: 'border-fuchsia-400/40', text: 'text-fuchsia-600 dark:text-fuchsia-300', dot: 'bg-fuchsia-400' },
 ]
 
+function ipToInt(ip: string): number {
+  const bare = ip.split('/')[0]
+  return bare.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0
+}
+
 export function getVlanColor(purpose: string, index: number) {
   const key = purpose.toLowerCase()
   return VLAN_PURPOSE_COLORS[key] ?? VLAN_INDEX_COLORS[index % VLAN_INDEX_COLORS.length]
@@ -55,6 +60,7 @@ export function getVlanColor(purpose: string, index: number) {
 export interface SubnetBrief {
   network: string
   hostCount: number
+  dhcpPoolSize: number
 }
 
 export interface VlanEmbedded {
@@ -125,7 +131,15 @@ function vlansToEmbedded(vlans: VLANTopology[]): VlanEmbedded[] {
     name: vlan.name,
     purpose: vlan.purpose,
     subnets: vlan.subnets.map((s) => s.network),
-    subnetDetails: vlan.subnets.map((s) => ({ network: s.network, hostCount: s.hosts.length })),
+    subnetDetails: vlan.subnets.map((s) => ({
+      network: s.network,
+      hostCount: s.hosts.length,
+      dhcpPoolSize: (s.dhcp_pools ?? []).reduce((sum, p) => {
+        const start = ipToInt(p.start_ip)
+        const end = ipToInt(p.end_ip)
+        return sum + (end - start + 1)
+      }, 0),
+    })),
     hostCount: vlan.subnets.reduce((sum, s) => sum + s.hosts.length, 0),
     colorIndex: i,
   }))
@@ -344,6 +358,11 @@ export function topologyToFlow(
     const standaloneSubnetsBrief: SubnetBrief[] = (site.standalone_subnets ?? []).map((s) => ({
       network: s.network,
       hostCount: s.hosts.length,
+      dhcpPoolSize: (s.dhcp_pools ?? []).reduce((sum, p) => {
+        const start = ipToInt(p.start_ip)
+        const end = ipToInt(p.end_ip)
+        return sum + (end - start + 1)
+      }, 0),
     }))
 
     nodes.push({

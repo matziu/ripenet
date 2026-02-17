@@ -27,22 +27,27 @@ function getUtilTextColor(pct: number): string {
 interface SubnetUtilBarProps {
   network: string
   hostCount: number
+  dhcpPoolSize?: number
   /** 'compact' = sidebar/table (thin bar + fraction), 'full' = detail panel (wider bar + %) */
   variant?: 'compact' | 'full'
   className?: string
 }
 
-export function SubnetUtilBar({ network, hostCount, variant = 'compact', className }: SubnetUtilBarProps) {
+export function SubnetUtilBar({ network, hostCount, dhcpPoolSize = 0, variant = 'compact', className }: SubnetUtilBarProps) {
   const usable = getUsableHosts(network)
   if (usable === 0) return null
-  const pct = Math.min(100, Math.round((hostCount / usable) * 100))
+  const allocated = hostCount + dhcpPoolSize
+  const pct = Math.min(100, Math.round((allocated / usable) * 100))
   const color = getUtilColor(pct)
 
   if (variant === 'full') {
     return (
       <div className={cn('space-y-1', className)}>
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">{hostCount} / {usable} hosts</span>
+          <span className="text-muted-foreground">
+            {allocated} / {usable} allocated
+            {dhcpPoolSize > 0 && <span className="text-[10px]"> ({hostCount} hosts + {dhcpPoolSize} DHCP)</span>}
+          </span>
           <span className={cn('font-medium', getUtilTextColor(pct))}>{pct}%</span>
         </div>
         <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -57,7 +62,7 @@ export function SubnetUtilBar({ network, hostCount, variant = 'compact', classNa
 
   // compact
   return (
-    <div className={cn('flex items-center gap-1', className)} title={`${hostCount}/${usable} hosts (${pct}%)`}>
+    <div className={cn('flex items-center gap-1', className)} title={`${allocated}/${usable} allocated (${pct}%)${dhcpPoolSize > 0 ? ` — ${hostCount} hosts + ${dhcpPoolSize} DHCP` : ''}`}>
       <div className="h-1.5 w-8 rounded-full bg-muted overflow-hidden shrink-0">
         <div
           className={cn('h-full rounded-full', color)}
