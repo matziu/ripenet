@@ -1,6 +1,7 @@
 import ipaddress
 
-from django.db.models import Count
+from django.db.models import Count, Q
+from django.db.models.expressions import RawSQL
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -34,6 +35,16 @@ class SubnetViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Subnet.objects.annotate(
             host_count=Count("hosts", distinct=True),
+            static_host_count=Count(
+                "hosts",
+                filter=Q(hosts__ip_type="static"),
+                distinct=True,
+            ),
+            dhcp_pool_total_size=RawSQL(
+                "COALESCE((SELECT SUM(dp.end_ip - dp.start_ip + 1) "
+                "FROM ipam_dhcp_pool dp WHERE dp.subnet_id = ipam_subnet.id), 0)",
+                [],
+            ),
         ).select_related("project", "site", "vlan", "vlan__site")
 
     @action(detail=True, methods=["get"], url_path="next-free-ip")

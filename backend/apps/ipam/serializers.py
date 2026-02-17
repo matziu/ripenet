@@ -84,6 +84,8 @@ class DHCPPoolSerializer(serializers.ModelSerializer):
 
 class SubnetSerializer(serializers.ModelSerializer):
     host_count = serializers.IntegerField(read_only=True, default=0)
+    static_host_count = serializers.IntegerField(read_only=True, default=0)
+    dhcp_pool_total_size = serializers.IntegerField(read_only=True, default=0)
     project = serializers.PrimaryKeyRelatedField(
         queryset=Project.objects.all(),
         required=False,
@@ -97,7 +99,7 @@ class SubnetSerializer(serializers.ModelSerializer):
         model = Subnet
         fields = [
             "id", "project", "site", "vlan", "network", "gateway", "description",
-            "host_count", "created_at", "updated_at",
+            "host_count", "static_host_count", "dhcp_pool_total_size", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 

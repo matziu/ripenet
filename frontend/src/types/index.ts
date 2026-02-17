@@ -74,6 +74,8 @@ export interface Subnet {
   gateway: string | null
   description: string
   host_count: number
+  static_host_count: number
+  dhcp_pool_total_size: number
   created_at: string
   updated_at: string
 }

@@ -273,7 +273,7 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
         <span className="text-sm font-semibold font-mono">{subnet.network}</span>
       </div>
 
-      <SubnetUtilBar network={subnet.network} hostCount={subnet.host_count} variant="full" />
+      <SubnetUtilBar network={subnet.network} hostCount={subnet.static_host_count} dhcpPoolSize={subnet.dhcp_pool_total_size} variant="full" />
 
       <dl className="space-y-1.5 text-xs">
         {subnet.gateway && <DetailRow label="Gateway" value={subnet.gateway} mono />}

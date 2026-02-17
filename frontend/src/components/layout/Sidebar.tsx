@@ -608,7 +608,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number })
         >
           <Server className="h-3 w-3 shrink-0" />
           <span className="truncate font-mono text-[11px]">{subnet.network}</span>
-          <SubnetUtilBar network={subnet.network} hostCount={subnet.host_count} className="ml-auto shrink-0" />
+          <SubnetUtilBar network={subnet.network} hostCount={subnet.static_host_count} dhcpPoolSize={subnet.dhcp_pool_total_size} className="ml-auto shrink-0" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); setAddHostOpen(true) }}

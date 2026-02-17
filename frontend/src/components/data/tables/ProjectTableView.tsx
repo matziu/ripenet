@@ -576,7 +576,7 @@ function SubnetRow({
             {subOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
             <Network className="h-3.5 w-3.5 text-emerald-500" />
             <span className="font-mono text-xs">{subnetNode.subnet.network}</span>
-            <SubnetUtilBar network={subnetNode.subnet.network} hostCount={subnetNode.hosts.length} className="ml-2" />
+            <SubnetUtilBar network={subnetNode.subnet.network} hostCount={staticHosts.length} dhcpPoolSize={subnetNode.subnet.dhcp_pool_total_size} className="ml-2" />
           </button>
         </td>
         <td className="px-2 md:px-3 py-1.5 text-muted-foreground text-xs hidden sm:table-cell">
