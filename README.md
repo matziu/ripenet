@@ -25,7 +25,6 @@ Web application for managing IP address infrastructure: projects, sites, VLANs, 
 ## Requirements
 
 - [Docker](https://docs.docker.com/get-docker/) (includes Docker Compose)
-- [Node.js](https://nodejs.org/) 18+ and npm (for frontend development)
 
 ## Quick Start (step by step)
 
@@ -46,33 +45,17 @@ cp .env.example .env
 
 The `.env` file contains database credentials and the admin password. Default values work out of the box for local development - you only need to change them for production.
 
-### 3. Start the backend services
+### 3. Start the app
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-Wait until you see `Starting development server at http://0.0.0.0:8000` in the output. On first run this will:
-- Download Docker images (~1 min)
-- Build the backend container
-- Start PostgreSQL and Redis
-- Run database migrations
-- Create an admin user
-- Load sample network data
+This single command starts everything: PostgreSQL, Redis, Django backend, and the Vite frontend dev server. On first run it will also download Docker images (~1 min), run database migrations, create an admin user, and load sample network data.
 
-### 4. Start the frontend (new terminal)
+Wait until you see `Local: http://localhost:3000` in the frontend container output.
 
-Open a **new terminal window** in the same directory and run:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Wait until you see `Local: http://localhost:3000` in the output.
-
-### 5. Open the app
+### 4. Open the app
 
 Go to **http://localhost:3000** in your browser and log in:
 
@@ -85,19 +68,18 @@ Go to **http://localhost:3000** in your browser and log in:
 
 ### Stopping the app
 
-- Frontend: press `Ctrl+C` in the frontend terminal
-- Backend: press `Ctrl+C` in the backend terminal, then run `docker compose -f docker-compose.dev.yml down`
+Press `Ctrl+C`, then run:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
 
 ### Starting again (after first setup)
 
-You don't need to rebuild each time. Just run:
+You don't need to rebuild each time:
 
 ```bash
-# Terminal 1 - backend
 docker compose -f docker-compose.dev.yml up
-
-# Terminal 2 - frontend
-cd frontend && npm run dev
 ```
 
 ## Production
