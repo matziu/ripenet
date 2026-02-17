@@ -5,7 +5,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.ipam.models import VLAN, Host, Subnet, Tunnel
+from apps.ipam.models import VLAN, Host, Subnet, Tunnel, DHCPPool
 from apps.ipam.permissions import ProjectPermission
 from apps.ipam.serializers import ProjectTopologySerializer
 
@@ -46,15 +46,32 @@ class ProjectViewSet(viewsets.ModelViewSet):
                             queryset=Subnet.objects.prefetch_related(
                                 Prefetch(
                                     "hosts",
-                                    queryset=Host.objects.all(),
-                                )
+                                    queryset=Host.objects.filter(ip_type="static"),
+                                ),
+                                Prefetch(
+                                    "dhcp_pools",
+                                    queryset=DHCPPool.objects.prefetch_related(
+                                        Prefetch(
+                                            "leases",
+                                            queryset=Host.objects.filter(ip_type="dhcp_lease"),
+                                        )
+                                    ),
+                                ),
                             ),
                         )
                     ),
                 ),
                 Prefetch(
                     "subnets",
-                    queryset=Subnet.objects.filter(vlan__isnull=True).prefetch_related("hosts"),
+                    queryset=Subnet.objects.filter(vlan__isnull=True).prefetch_related(
+                        Prefetch("hosts", queryset=Host.objects.filter(ip_type="static")),
+                        Prefetch(
+                            "dhcp_pools",
+                            queryset=DHCPPool.objects.prefetch_related(
+                                Prefetch("leases", queryset=Host.objects.filter(ip_type="dhcp_lease"))
+                            ),
+                        ),
+                    ),
                 ),
             )
         )

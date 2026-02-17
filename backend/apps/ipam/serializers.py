@@ -187,15 +187,29 @@ class TunnelSerializer(serializers.ModelSerializer):
 class HostTopologySerializer(serializers.ModelSerializer):
     class Meta:
         model = Host
-        fields = ["id", "ip_address", "hostname", "device_type"]
+        fields = ["id", "ip_address", "hostname", "device_type", "ip_type", "dhcp_pool"]
+
+
+class DHCPPoolTopologySerializer(serializers.ModelSerializer):
+    leases = HostTopologySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DHCPPool
+        fields = ["id", "start_ip", "end_ip", "description", "leases"]
 
 
 class SubnetTopologySerializer(serializers.ModelSerializer):
-    hosts = HostTopologySerializer(many=True, read_only=True)
+    hosts = serializers.SerializerMethodField()
+    dhcp_pools = DHCPPoolTopologySerializer(many=True, read_only=True)
 
     class Meta:
         model = Subnet
-        fields = ["id", "network", "gateway", "description", "hosts"]
+        fields = ["id", "network", "gateway", "description", "hosts", "dhcp_pools"]
+
+    def get_hosts(self, obj):
+        """Only return static hosts at the subnet level."""
+        qs = obj.hosts.filter(ip_type="static")
+        return HostTopologySerializer(qs, many=True).data
 
 
 class VLANTopologySerializer(serializers.ModelSerializer):
