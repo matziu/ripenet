@@ -59,20 +59,6 @@ export function HostForm({ subnetId, projectId, host, defaultIpType, defaultDhcp
   const selectedSubnet = watch('subnet')
   const effectiveSubnetId = resolvedSubnetId ?? (selectedSubnet ? parseInt(selectedSubnet, 10) : undefined)
 
-  // Suggest next free IP
-  const { data: nextFreeIp } = useQuery({
-    queryKey: ['nextFreeIp', effectiveSubnetId],
-    queryFn: () => subnetsApi.nextFreeIp(effectiveSubnetId!),
-    select: (res) => res.data.next_free_ip,
-    enabled: !host && !!effectiveSubnetId,
-  })
-
-  useEffect(() => {
-    if (nextFreeIp && !host) {
-      setValue('ip_address', nextFreeIp)
-    }
-  }, [nextFreeIp, host, setValue])
-
   const { data: dhcpPools } = useQuery({
     queryKey: ['dhcp-pools', { subnet: effectiveSubnetId }],
     queryFn: () => dhcpPoolsApi.list({ subnet: String(effectiveSubnetId!) }),
@@ -81,6 +67,22 @@ export function HostForm({ subnetId, projectId, host, defaultIpType, defaultDhcp
   })
 
   const watchIpType = watch('ip_type')
+  const watchDhcpPool = watch('dhcp_pool')
+  const selectedPoolId = watchIpType === 'dhcp_lease' && watchDhcpPool ? parseInt(watchDhcpPool, 10) : undefined
+
+  // Suggest next free IP — for leases: within pool range; for static: outside pools
+  const { data: nextFreeIp } = useQuery({
+    queryKey: ['nextFreeIp', effectiveSubnetId, selectedPoolId],
+    queryFn: () => subnetsApi.nextFreeIp(effectiveSubnetId!, selectedPoolId),
+    select: (res) => res.data.next_free_ip,
+    enabled: !host && !!effectiveSubnetId && (watchIpType === 'static' || !!selectedPoolId),
+  })
+
+  useEffect(() => {
+    if (nextFreeIp && !host) {
+      setValue('ip_address', nextFreeIp)
+    }
+  }, [nextFreeIp, host, setValue])
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {

@@ -49,7 +49,11 @@ class SubnetViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="next-free-ip")
     def next_free_ip(self, request, pk=None):
-        """Suggest the next available IP address in this subnet."""
+        """Suggest the next available IP address in this subnet.
+
+        Query params:
+          ?pool=<id>  — restrict suggestions to the given DHCP pool range
+        """
         subnet_obj = self.get_object()
         network = ipaddress.ip_network(str(subnet_obj.network), strict=False)
 
@@ -63,11 +67,47 @@ class SubnetViewSet(viewsets.ModelViewSet):
             used_ips.add(str(t.ip_a).split("/")[0])
             used_ips.add(str(t.ip_b).split("/")[0])
 
-        # Skip network and broadcast addresses
-        hosts = list(network.hosts())
-        for ip in hosts:
-            if str(ip) not in used_ips:
-                return Response({"next_free_ip": str(ip)})
+        # Exclude gateway
+        if subnet_obj.gateway:
+            used_ips.add(str(subnet_obj.gateway).split("/")[0])
+
+        # If pool param is given, search only within that pool's range
+        pool_id = request.query_params.get("pool")
+        if pool_id:
+            from .models import DHCPPool
+            try:
+                pool = DHCPPool.objects.get(pk=pool_id, subnet=subnet_obj)
+            except DHCPPool.DoesNotExist:
+                return Response(
+                    {"detail": "Pool not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            pool_start = int(ipaddress.ip_address(str(pool.start_ip).split("/")[0]))
+            pool_end = int(ipaddress.ip_address(str(pool.end_ip).split("/")[0]))
+            for ip_int in range(pool_start, pool_end + 1):
+                ip = ipaddress.ip_address(ip_int)
+                if str(ip) not in used_ips:
+                    return Response({"next_free_ip": str(ip)})
+            return Response(
+                {"detail": "No free IP addresses in this pool"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Default: search entire subnet, skip DHCP pool ranges
+        pool_ranges = []
+        for pool in subnet_obj.dhcp_pools.all():
+            ps = int(ipaddress.ip_address(str(pool.start_ip).split("/")[0]))
+            pe = int(ipaddress.ip_address(str(pool.end_ip).split("/")[0]))
+            pool_ranges.append((ps, pe))
+
+        for ip in network.hosts():
+            ip_str = str(ip)
+            if ip_str in used_ips:
+                continue
+            ip_int = int(ip)
+            if any(ps <= ip_int <= pe for ps, pe in pool_ranges):
+                continue
+            return Response({"next_free_ip": ip_str})
 
         return Response(
             {"detail": "No free IP addresses in this subnet"},

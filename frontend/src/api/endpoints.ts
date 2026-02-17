@@ -68,8 +68,8 @@ export const subnetsApi = {
     apiClient.patch<Subnet>(`/subnets/${id}/`, data),
   delete: (id: number) =>
     apiClient.delete(`/subnets/${id}/`),
-  nextFreeIp: (id: number) =>
-    apiClient.get<{ next_free_ip: string }>(`/subnets/${id}/next-free-ip/`),
+  nextFreeIp: (id: number, poolId?: number) =>
+    apiClient.get<{ next_free_ip: string }>(`/subnets/${id}/next-free-ip/`, poolId ? { params: { pool: poolId } } : undefined),
   suggestedPoolRange: (id: number) =>
     apiClient.get<{ start_ip: string; end_ip: string; size: number }>(`/subnets/${id}/suggested-pool-range/`),
 }
