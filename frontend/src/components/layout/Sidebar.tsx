@@ -220,18 +220,13 @@ function ProjectTreeItem({
           <span className="truncate">{project.name}</span>
           <span className="ml-auto text-xs text-muted-foreground shrink-0">{project.site_count}</span>
         </button>
-        {isActive && (
-          <button
-            onClick={(e) => { e.stopPropagation(); setAddSiteOpen(true) }}
-            className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Add site"
-          >
-            <Plus className="h-3 w-3" />
-          </button>
-        )}
         <DropdownMenu items={[
+          ...(isActive ? [
+            { label: 'Add Site', icon: <MapPin className="h-3 w-3" />, onClick: () => setAddSiteOpen(true) },
+            { label: 'Add Tunnel', icon: <Cable className="h-3 w-3" />, onClick: () => setAddTunnelOpen(true) },
+          ] : []),
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
-          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: confirmDelete },
+          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive' as const, onClick: confirmDelete },
         ]} />
       </div>
 
@@ -242,36 +237,15 @@ function ProjectTreeItem({
           ))}
           {tunnels.length > 0 && (
             <>
-              <div className="flex items-center justify-between px-1.5 pt-1">
+              <div className="px-1.5 pt-1">
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                   Tunnels
                 </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setAddTunnelOpen(true) }}
-                  className="p-0.5 rounded hover:bg-accent transition-opacity shrink-0"
-                  title="Add tunnel"
-                >
-                  <Plus className="h-3 w-3 text-muted-foreground" />
-                </button>
               </div>
               {tunnels.map((tunnel) => (
                 <TunnelTreeItem key={tunnel.id} tunnel={tunnel} projectId={project.id} />
               ))}
             </>
-          )}
-          {tunnels.length === 0 && (
-            <div className="flex items-center justify-between px-1.5 pt-1">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Tunnels
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); setAddTunnelOpen(true) }}
-                className="p-0.5 rounded hover:bg-accent transition-opacity shrink-0"
-                title="Add tunnel"
-              >
-                <Plus className="h-3 w-3 text-muted-foreground" />
-              </button>
-            </div>
           )}
         </div>
       )}
@@ -365,16 +339,11 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
           <span className="truncate">{site.name}</span>
           <span className="ml-auto text-muted-foreground shrink-0">{site.vlan_count}v</span>
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); setAddVlanOpen(true) }}
-          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          title="Add VLAN"
-        >
-          <Plus className="h-3 w-3" />
-        </button>
         <DropdownMenu items={[
+          { label: 'Add VLAN', icon: <Network className="h-3 w-3" />, onClick: () => setAddVlanOpen(true) },
+          { label: 'Add Subnet', icon: <Server className="h-3 w-3" />, onClick: () => setAddStandaloneSubnetOpen(true) },
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
-          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
+          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive' as const, onClick: () => {
             if (window.confirm(`Delete site "${site.name}"?`)) deleteMutation.mutate()
           }},
         ]} />
@@ -387,36 +356,15 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
           ))}
           {standaloneSubnets && standaloneSubnets.length > 0 && (
             <>
-              <div className="flex items-center justify-between px-1.5 pt-1">
+              <div className="px-1.5 pt-1">
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                   Subnets
                 </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setAddStandaloneSubnetOpen(true) }}
-                  className="p-0.5 rounded hover:bg-accent transition-opacity shrink-0"
-                  title="Add subnet"
-                >
-                  <Plus className="h-3 w-3 text-muted-foreground" />
-                </button>
               </div>
               {standaloneSubnets.map((subnet) => (
                 <SubnetTreeItem key={subnet.id} subnet={subnet} />
               ))}
             </>
-          )}
-          {(!standaloneSubnets || standaloneSubnets.length === 0) && (
-            <div className="flex items-center justify-between px-1.5 pt-1">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Subnets
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); setAddStandaloneSubnetOpen(true) }}
-                className="p-0.5 rounded hover:bg-accent transition-opacity shrink-0"
-                title="Add subnet"
-              >
-                <Plus className="h-3 w-3 text-muted-foreground" />
-              </button>
-            </div>
           )}
         </div>
       )}
@@ -502,16 +450,10 @@ function VlanTreeItem({ vlan, siteId }: { vlan: VLAN; siteId: number }) {
           <span className="shrink-0">VLAN {vlan.vlan_id}</span>
           <span className="truncate text-muted-foreground text-[10px]">{vlan.name}</span>
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); setAddSubnetOpen(true) }}
-          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          title="Add subnet"
-        >
-          <Plus className="h-3 w-3" />
-        </button>
         <DropdownMenu items={[
+          { label: 'Add Subnet', icon: <Server className="h-3 w-3" />, onClick: () => setAddSubnetOpen(true) },
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
-          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
+          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive' as const, onClick: () => {
             if (window.confirm(`Delete VLAN ${vlan.vlan_id}?`)) deleteMutation.mutate()
           }},
         ]} />
@@ -610,17 +552,11 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number })
           <span className="truncate font-mono text-[11px]">{subnet.network}</span>
           <SubnetUtilBar network={subnet.network} hostCount={subnet.static_host_count} dhcpPoolSize={subnet.dhcp_pool_total_size} className="ml-auto shrink-0" />
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); setAddHostOpen(true) }}
-          className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          title="Add host"
-        >
-          <Plus className="h-3 w-3" />
-        </button>
         <DropdownMenu items={[
+          { label: 'Add Host', icon: <Monitor className="h-3 w-3" />, onClick: () => setAddHostOpen(true) },
           { label: 'Add Pool', icon: <Layers className="h-3 w-3" />, onClick: () => setAddPoolOpen(true) },
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
-          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
+          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive' as const, onClick: () => {
             if (window.confirm(`Delete subnet ${subnet.network}?`)) deleteMutation.mutate()
           }},
         ]} />
