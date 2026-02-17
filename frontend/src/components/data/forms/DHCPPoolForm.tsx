@@ -66,8 +66,8 @@ export function DHCPPoolForm({ subnetId, pool, onClose }: DHCPPoolFormProps) {
 
   const { register, handleSubmit, setValue, watch } = useForm<FormValues>({
     defaultValues: pool ? {
-      start_ip: pool.start_ip,
-      end_ip: pool.end_ip,
+      start_ip: pool.start_ip.split('/')[0],
+      end_ip: pool.end_ip.split('/')[0],
       description: pool.description,
     } : {},
   })

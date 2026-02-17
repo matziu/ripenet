@@ -482,6 +482,7 @@ function HostDetail({ hostId }: { hostId: number }) {
 
 function DHCPPoolDetail({ poolId }: { poolId: number }) {
   const queryClient = useQueryClient()
+  const setSelectedSubnet = useSelectionStore((s) => s.setSelectedSubnet)
   const [editOpen, setEditOpen] = useState(false)
   const [addHostOpen, setAddHostOpen] = useState(false)
 
@@ -489,6 +490,13 @@ function DHCPPoolDetail({ poolId }: { poolId: number }) {
     queryKey: ['dhcp-pool', poolId],
     queryFn: () => dhcpPoolsApi.get(poolId),
     select: (res) => res.data,
+  })
+
+  const { data: subnet } = useQuery({
+    queryKey: ['subnet', pool?.subnet],
+    queryFn: () => subnetsApi.get(pool!.subnet),
+    select: (res) => res.data,
+    enabled: !!pool,
   })
 
   const { data: hostsData } = useQuery({
@@ -515,17 +523,38 @@ function DHCPPoolDetail({ poolId }: { poolId: number }) {
 
   if (!pool) return <DetailLoading />
 
+  const startIp = pool.start_ip.split('/')[0]
+  const endIp = pool.end_ip.split('/')[0]
+
+  // Calculate pool size
+  const ipToInt = (ip: string) => {
+    const parts = ip.split('.')
+    return parts.reduce((acc, p) => (acc << 8) + parseInt(p, 10), 0) >>> 0
+  }
+  const poolSize = ipToInt(endIp) - ipToInt(startIp) + 1
+
   return (
     <div className="p-3 space-y-3">
       <div className="flex items-center gap-2">
         <Layers className="h-4 w-4 text-primary shrink-0" />
-        <span className="text-sm font-semibold font-mono">
-          {pool.start_ip.split('/')[0]} – {pool.end_ip.split('/')[0]}
-        </span>
+        <div className="min-w-0">
+          <span className="text-sm font-semibold font-mono block">
+            {startIp} – {endIp}
+          </span>
+          {subnet && (
+            <button
+              onClick={() => setSelectedSubnet(pool.subnet)}
+              className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
+            >
+              ← {subnet.network}
+            </button>
+          )}
+        </div>
       </div>
 
       <dl className="space-y-1.5 text-xs">
-        <DetailRow label="Leases" value={String(hosts.length)} />
+        <DetailRow label="Pool Size" value={`${poolSize} addresses`} />
+        <DetailRow label="Leases" value={`${hosts.length} / ${poolSize}`} />
         {pool.description && <DetailRow label="Description" value={pool.description} />}
       </dl>
 

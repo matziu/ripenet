@@ -632,7 +632,7 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number })
             <HostTreeItem key={host.id} host={host} subnetId={subnet.id} />
           ))}
           {dhcpPools?.map((pool) => (
-            <DHCPPoolTreeItem key={`pool-${pool.id}`} pool={pool} depth={1} closeMobile={closeMobile} />
+            <DHCPPoolTreeItem key={`pool-${pool.id}`} pool={pool} closeMobile={closeMobile} />
           ))}
         </div>
       )}
@@ -723,16 +723,17 @@ function TunnelTreeItem({ tunnel, projectId }: { tunnel: Tunnel; projectId: numb
 
 // ── DHCP Pool ────────────────────────────────────────────────
 
-function DHCPPoolTreeItem({ pool, depth, closeMobile }: {
+function DHCPPoolTreeItem({ pool, closeMobile }: {
   pool: DHCPPool
-  depth: number
   closeMobile: () => void
 }) {
+  const queryClient = useQueryClient()
   const selectedDhcpPoolId = useSelectionStore((s) => s.selectedDhcpPoolId)
   const setSelectedDhcpPool = useSelectionStore((s) => s.setSelectedDhcpPool)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
   const [expanded, setExpanded] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const isSelected = selectedDhcpPoolId === pool.id
 
   const { data: leases } = useQuery({
@@ -740,6 +741,19 @@ function DHCPPoolTreeItem({ pool, depth, closeMobile }: {
     queryFn: () => hostsApi.list({ dhcp_pool: String(pool.id) }),
     select: (res) => res.data.results,
     enabled: expanded,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => dhcpPoolsApi.delete(pool.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] })
+      queryClient.invalidateQueries({ queryKey: ['topology'] })
+      toast.success('DHCP Pool deleted')
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to delete'
+      toast.error(message)
+    },
   })
 
   const startIp = pool.start_ip.split('/')[0]
@@ -751,34 +765,55 @@ function DHCPPoolTreeItem({ pool, depth, closeMobile }: {
     closeMobile()
   }
 
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setExpanded(!expanded)
+  }
+
   return (
     <div>
-      <div
-        onClick={handleClick}
-        className={cn(
-          'flex items-center gap-1 py-1 px-2 text-xs cursor-pointer rounded hover:bg-accent/50 transition-colors',
-          isSelected && 'bg-accent',
-        )}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-      >
-        <button
-          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          {expanded ? '\u25BE' : '\u25B8'}
+      <div className="group flex items-center">
+        <button onClick={handleToggle} className="p-0.5 shrink-0">
+          {expanded ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
         </button>
-        <Layers className="h-3 w-3 text-blue-500 shrink-0" />
-        <span className="font-mono text-[11px] truncate">
-          {startIp}\u2013{endIp}
-        </span>
-        <span className="ml-auto text-[10px] text-muted-foreground">
-          {pool.lease_count}
-        </span>
+        <button
+          onClick={handleClick}
+          className={cn(
+            'flex flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors min-w-0',
+            isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
+          )}
+        >
+          <Layers className="h-3 w-3 text-blue-500 shrink-0" />
+          <span className="font-mono text-[11px] truncate">
+            {startIp}&ndash;{endIp}
+          </span>
+          <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
+            {pool.lease_count}
+          </span>
+        </button>
+        <DropdownMenu items={[
+          { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
+          { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive', onClick: () => {
+            if (window.confirm('Delete this DHCP pool?')) deleteMutation.mutate()
+          }},
+        ]} />
       </div>
 
-      {expanded && leases?.map((host) => (
-        <HostTreeItem key={host.id} host={host} subnetId={host.subnet} />
-      ))}
+      {expanded && leases && leases.length > 0 && (
+        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
+          {leases.map((host) => (
+            <HostTreeItem key={host.id} host={host} subnetId={host.subnet} />
+          ))}
+        </div>
+      )}
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit DHCP Pool">
+        <DHCPPoolForm subnetId={pool.subnet} pool={pool} onClose={() => setEditOpen(false)} />
+      </Dialog>
     </div>
   )
 }
