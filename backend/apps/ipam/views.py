@@ -63,6 +63,79 @@ class SubnetViewSet(viewsets.ModelViewSet):
             status=status.HTTP_404_NOT_FOUND,
         )
 
+    @action(detail=True, methods=["get"], url_path="suggested-pool-range")
+    def suggested_pool_range(self, request, pk=None):
+        """Suggest the largest contiguous free IP block for a DHCP pool."""
+        subnet_obj = self.get_object()
+        network = ipaddress.ip_network(str(subnet_obj.network), strict=False)
+
+        # Usable host range (exclude network + broadcast)
+        range_start = int(network.network_address) + 1
+        range_end = int(network.broadcast_address) - 1
+
+        if range_start > range_end:
+            return Response(
+                {"detail": "Subnet too small for a pool"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Collect occupied intervals as (start_int, end_int)
+        occupied = []
+
+        if subnet_obj.gateway:
+            gw = int(ipaddress.ip_address(str(subnet_obj.gateway).split("/")[0]))
+            occupied.append((gw, gw))
+
+        for h in subnet_obj.hosts.all():
+            ip = int(ipaddress.ip_address(str(h.ip_address).split("/")[0]))
+            occupied.append((ip, ip))
+
+        for pool in subnet_obj.dhcp_pools.all():
+            s = int(ipaddress.ip_address(str(pool.start_ip).split("/")[0]))
+            e = int(ipaddress.ip_address(str(pool.end_ip).split("/")[0]))
+            occupied.append((s, e))
+
+        # Sort and merge intervals
+        occupied.sort()
+        merged = []
+        for start, end in occupied:
+            if merged and start <= merged[-1][1] + 1:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+
+        # Find largest gap
+        best = None
+        prev_end = range_start - 1
+
+        for occ_start, occ_end in merged:
+            gap_start = prev_end + 1
+            gap_end = occ_start - 1
+            if gap_start <= gap_end and gap_start >= range_start and gap_end <= range_end:
+                size = gap_end - gap_start + 1
+                if best is None or size > best[2]:
+                    best = (gap_start, gap_end, size)
+            prev_end = max(prev_end, occ_end)
+
+        # Gap after last occupied
+        gap_start = prev_end + 1
+        if gap_start <= range_end:
+            size = range_end - gap_start + 1
+            if best is None or size > best[2]:
+                best = (gap_start, range_end, size)
+
+        if best:
+            return Response({
+                "start_ip": str(ipaddress.ip_address(best[0])),
+                "end_ip": str(ipaddress.ip_address(best[1])),
+                "size": best[2],
+            })
+
+        return Response(
+            {"detail": "No free address space in this subnet"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
 
 class HostViewSet(viewsets.ModelViewSet):
     serializer_class = HostSerializer

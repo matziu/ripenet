@@ -70,6 +70,8 @@ export const subnetsApi = {
     apiClient.delete(`/subnets/${id}/`),
   nextFreeIp: (id: number) =>
     apiClient.get<{ next_free_ip: string }>(`/subnets/${id}/next-free-ip/`),
+  suggestedPoolRange: (id: number) =>
+    apiClient.get<{ start_ip: string; end_ip: string; size: number }>(`/subnets/${id}/suggested-pool-range/`),
 }
 
 // Hosts

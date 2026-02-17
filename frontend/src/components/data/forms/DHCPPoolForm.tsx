@@ -1,6 +1,7 @@
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { dhcpPoolsApi } from '@/api/endpoints'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { dhcpPoolsApi, subnetsApi } from '@/api/endpoints'
 import { toast } from 'sonner'
 import type { DHCPPool } from '@/types'
 
@@ -16,16 +17,81 @@ interface FormValues {
   description: string
 }
 
+function ipToInt(ip: string): number | null {
+  const clean = ip.trim().split('/')[0]
+  const parts = clean.split('.')
+  if (parts.length !== 4) return null
+  let result = 0
+  for (const p of parts) {
+    const n = parseInt(p, 10)
+    if (isNaN(n) || n < 0 || n > 255) return null
+    result = (result << 8) + n
+  }
+  return result >>> 0
+}
+
+function extractApiError(err: unknown): string {
+  const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
+  if (!data) return 'Failed to save DHCP pool'
+
+  if (typeof data === 'string') return data
+  if (data.detail && typeof data.detail === 'string') return data.detail
+  if (data.non_field_errors && Array.isArray(data.non_field_errors))
+    return data.non_field_errors.join('. ')
+
+  // Field-level errors
+  const messages: string[] = []
+  for (const [key, value] of Object.entries(data)) {
+    if (Array.isArray(value)) {
+      messages.push(`${value.join(', ')}`)
+    } else if (typeof value === 'string') {
+      messages.push(`${key}: ${value}`)
+    }
+  }
+  if (messages.length > 0) return messages.join('. ')
+
+  return 'Failed to save DHCP pool'
+}
+
 export function DHCPPoolForm({ subnetId, pool, onClose }: DHCPPoolFormProps) {
   const queryClient = useQueryClient()
 
-  const { register, handleSubmit } = useForm<FormValues>({
+  // Fetch suggested range for new pools
+  const { data: suggested } = useQuery({
+    queryKey: ['suggestedPoolRange', subnetId],
+    queryFn: () => subnetsApi.suggestedPoolRange(subnetId),
+    select: (res) => res.data,
+    enabled: !pool,
+  })
+
+  const { register, handleSubmit, setValue, watch } = useForm<FormValues>({
     defaultValues: pool ? {
       start_ip: pool.start_ip,
       end_ip: pool.end_ip,
       description: pool.description,
     } : {},
   })
+
+  // Auto-fill suggested range
+  useEffect(() => {
+    if (suggested && !pool) {
+      setValue('start_ip', suggested.start_ip)
+      setValue('end_ip', suggested.end_ip)
+    }
+  }, [suggested, pool, setValue])
+
+  const watchStartIp = watch('start_ip')
+  const watchEndIp = watch('end_ip')
+
+  // Calculate host count from range
+  const hostCount = useMemo(() => {
+    if (!watchStartIp || !watchEndIp) return null
+    const start = ipToInt(watchStartIp)
+    const end = ipToInt(watchEndIp)
+    if (start === null || end === null) return null
+    if (end < start) return null
+    return end - start + 1
+  }, [watchStartIp, watchEndIp])
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {
@@ -37,12 +103,12 @@ export function DHCPPoolForm({ subnetId, pool, onClose }: DHCPPoolFormProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] })
       queryClient.invalidateQueries({ queryKey: ['topology'] })
+      queryClient.invalidateQueries({ queryKey: ['suggestedPoolRange'] })
       toast.success(pool ? 'DHCP Pool updated' : 'DHCP Pool created')
       onClose()
     },
     onError: (err: unknown) => {
-      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to save DHCP pool'
-      toast.error(message)
+      toast.error(extractApiError(err))
     },
   })
 
@@ -55,6 +121,9 @@ export function DHCPPoolForm({ subnetId, pool, onClose }: DHCPPoolFormProps) {
           placeholder="e.g. 10.0.1.100"
           className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
         />
+        {suggested && !pool && (
+          <p className="text-[10px] text-muted-foreground mt-0.5">Suggested: {suggested.start_ip}</p>
+        )}
       </div>
 
       <div>
@@ -64,7 +133,18 @@ export function DHCPPoolForm({ subnetId, pool, onClose }: DHCPPoolFormProps) {
           placeholder="e.g. 10.0.1.200"
           className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono"
         />
+        {suggested && !pool && (
+          <p className="text-[10px] text-muted-foreground mt-0.5">Suggested: {suggested.end_ip}</p>
+        )}
       </div>
+
+      {hostCount !== null && (
+        <div className="rounded-md bg-muted/50 px-3 py-2 text-xs">
+          <span className="text-muted-foreground">Pool size: </span>
+          <span className="font-semibold font-mono">{hostCount}</span>
+          <span className="text-muted-foreground"> {hostCount === 1 ? 'address' : 'addresses'}</span>
+        </div>
+      )}
 
       <div>
         <label className="text-xs font-medium">Description</label>
