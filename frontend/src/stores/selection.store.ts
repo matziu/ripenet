@@ -7,6 +7,7 @@ interface SelectionState {
   selectedSubnetId: number | null
   selectedHostId: number | null
   selectedTunnelId: number | null
+  selectedDhcpPoolId: number | null
   expandedProjectIds: Set<number>
   expandedSiteIds: Set<number>
   expandedVlanIds: Set<number>
@@ -18,6 +19,7 @@ interface SelectionState {
   setSelectedSubnet: (id: number | null) => void
   setSelectedHost: (id: number | null) => void
   setSelectedTunnel: (id: number | null) => void
+  setSelectedDhcpPool: (id: number | null) => void
   toggleExpandedSite: (id: number) => void
   toggleExpandedVlan: (id: number) => void
   toggleExpandedSubnet: (id: number) => void
@@ -33,6 +35,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   selectedSubnetId: null,
   selectedHostId: null,
   selectedTunnelId: null,
+  selectedDhcpPoolId: null,
   expandedProjectIds: new Set(),
   expandedSiteIds: new Set(),
   expandedVlanIds: new Set(),
@@ -42,12 +45,17 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     if (next.has(id)) next.delete(id); else next.add(id)
     set({ expandedProjectIds: next })
   },
-  setSelectedProject: (id) => set({ selectedProjectId: id, selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null, selectedTunnelId: null }),
-  setSelectedSite: (id) => set({ selectedSiteId: id, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null, selectedTunnelId: null }),
-  setSelectedVlan: (id) => set({ selectedVlanId: id, selectedSubnetId: null, selectedHostId: null, selectedTunnelId: null }),
-  setSelectedSubnet: (id) => set({ selectedSubnetId: id, selectedHostId: null, selectedTunnelId: null }),
-  setSelectedHost: (id) => set({ selectedHostId: id, selectedTunnelId: null }),
-  setSelectedTunnel: (id) => set({ selectedTunnelId: id, selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null }),
+  setSelectedProject: (id) => set({ selectedProjectId: id, selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null, selectedTunnelId: null, selectedDhcpPoolId: null }),
+  setSelectedSite: (id) => set({ selectedSiteId: id, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null, selectedTunnelId: null, selectedDhcpPoolId: null }),
+  setSelectedVlan: (id) => set({ selectedVlanId: id, selectedSubnetId: null, selectedHostId: null, selectedTunnelId: null, selectedDhcpPoolId: null }),
+  setSelectedSubnet: (id) => set({ selectedSubnetId: id, selectedHostId: null, selectedTunnelId: null, selectedDhcpPoolId: null }),
+  setSelectedHost: (id) => set({ selectedHostId: id, selectedTunnelId: null, selectedDhcpPoolId: null }),
+  setSelectedTunnel: (id) => set({ selectedTunnelId: id, selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null, selectedDhcpPoolId: null }),
+  setSelectedDhcpPool: (id) => set({
+    selectedDhcpPoolId: id,
+    selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null,
+    selectedHostId: null, selectedTunnelId: null,
+  }),
   toggleExpandedSite: (id) => {
     const next = new Set(get().expandedSiteIds)
     if (next.has(id)) next.delete(id); else next.add(id)
@@ -75,5 +83,5 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     expandedVlanIds: new Set(),
     expandedSubnetIds: new Set(),
   }),
-  clearSelection: () => set({ selectedProjectId: null, selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null, selectedTunnelId: null }),
+  clearSelection: () => set({ selectedProjectId: null, selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null, selectedHostId: null, selectedTunnelId: null, selectedDhcpPoolId: null }),
 }))

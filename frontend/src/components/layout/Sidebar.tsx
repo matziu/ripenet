@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { projectsApi, sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi } from '@/api/endpoints'
+import { projectsApi, sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi } from '@/api/endpoints'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
 import { cn, copyToClipboard } from '@/lib/utils'
@@ -15,11 +15,11 @@ import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { ProjectForm } from '@/components/data/forms/ProjectForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { toast } from 'sonner'
-import type { Project, Site, VLAN, Subnet, Host, Tunnel } from '@/types'
+import type { Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool } from '@/types'
 import {
   FolderOpen, MapPin, Network, Server, Monitor,
   ChevronRight, ChevronDown, Plus,
-  Pencil, Trash2, Cable,
+  Pencil, Trash2, Cable, Layers,
   ChevronsUpDown, ChevronsDownUp,
 } from 'lucide-react'
 
@@ -567,6 +567,13 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number })
     enabled: expanded,
   })
 
+  const { data: dhcpPools } = useQuery({
+    queryKey: ['dhcp-pools', { subnet: subnet.id }],
+    queryFn: () => dhcpPoolsApi.list({ subnet: String(subnet.id) }),
+    select: (res) => res.data.results,
+    enabled: expanded,
+  })
+
   const hosts = hostsData ?? []
 
   const handleClick = () => {
@@ -616,10 +623,13 @@ function SubnetTreeItem({ subnet, vlanId }: { subnet: Subnet; vlanId?: number })
         ]} />
       </div>
 
-      {expanded && hosts.length > 0 && (
+      {expanded && (hosts.length > 0 || (dhcpPools && dhcpPools.length > 0)) && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
           {hosts.map((host) => (
             <HostTreeItem key={host.id} host={host} subnetId={subnet.id} />
+          ))}
+          {dhcpPools?.map((pool) => (
+            <DHCPPoolTreeItem key={`pool-${pool.id}`} pool={pool} depth={1} closeMobile={closeMobile} />
           ))}
         </div>
       )}
@@ -700,6 +710,68 @@ function TunnelTreeItem({ tunnel, projectId }: { tunnel: Tunnel; projectId: numb
       <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Tunnel">
         <TunnelForm projectId={projectId} tunnel={tunnel} onClose={() => setEditOpen(false)} />
       </Dialog>
+    </div>
+  )
+}
+
+// ── DHCP Pool ────────────────────────────────────────────────
+
+function DHCPPoolTreeItem({ pool, depth, closeMobile }: {
+  pool: DHCPPool
+  depth: number
+  closeMobile: () => void
+}) {
+  const selectedDhcpPoolId = useSelectionStore((s) => s.selectedDhcpPoolId)
+  const setSelectedDhcpPool = useSelectionStore((s) => s.setSelectedDhcpPool)
+  const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
+  const [expanded, setExpanded] = useState(false)
+  const isSelected = selectedDhcpPoolId === pool.id
+
+  const { data: leases } = useQuery({
+    queryKey: ['hosts', { dhcp_pool: pool.id }],
+    queryFn: () => hostsApi.list({ dhcp_pool: String(pool.id) }),
+    select: (res) => res.data.results,
+    enabled: expanded,
+  })
+
+  const startIp = pool.start_ip.split('/')[0]
+  const endIp = pool.end_ip.split('/')[0]
+
+  const handleClick = () => {
+    setSelectedDhcpPool(pool.id)
+    if (!detailPanelOpen) toggleDetailPanel()
+    closeMobile()
+  }
+
+  return (
+    <div>
+      <div
+        onClick={handleClick}
+        className={cn(
+          'flex items-center gap-1 py-1 px-2 text-xs cursor-pointer rounded hover:bg-accent/50 transition-colors',
+          isSelected && 'bg-accent',
+        )}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      >
+        <button
+          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          {expanded ? '\u25BE' : '\u25B8'}
+        </button>
+        <Layers className="h-3 w-3 text-blue-500 shrink-0" />
+        <span className="font-mono text-[11px] truncate">
+          {startIp}\u2013{endIp}
+        </span>
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {pool.lease_count}
+        </span>
+      </div>
+
+      {expanded && leases?.map((host) => (
+        <HostTreeItem key={host.id} host={host} subnetId={host.subnet} />
+      ))}
     </div>
   )
 }

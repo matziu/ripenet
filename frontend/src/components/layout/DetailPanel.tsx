@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui.store'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useTopologyStore } from '@/stores/topology.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi } from '@/api/endpoints'
+import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
 import { cn } from '@/lib/utils'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
@@ -12,12 +12,13 @@ import { SiteForm } from '@/components/data/forms/SiteForm'
 import { VlanForm } from '@/components/data/forms/VlanForm'
 import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
+import { DHCPPoolForm } from '@/components/data/forms/DHCPPoolForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { toast } from 'sonner'
 import type { Host } from '@/types'
 import {
   X, Pencil, Trash2, Plus,
-  MapPin, Network, Server, Monitor, Cable,
+  MapPin, Network, Server, Monitor, Cable, Layers,
 } from 'lucide-react'
 
 export function DetailPanel({ className }: { className?: string }) {
@@ -29,23 +30,26 @@ export function DetailPanel({ className }: { className?: string }) {
   const selectedSubnetId = useSelectionStore((s) => s.selectedSubnetId)
   const selectedHostId = useSelectionStore((s) => s.selectedHostId)
   const selectedTunnelId = useSelectionStore((s) => s.selectedTunnelId)
+  const selectedDhcpPoolId = useSelectionStore((s) => s.selectedDhcpPoolId)
   const selectedProjectId = useSelectionStore((s) => s.selectedProjectId)
 
   // Also listen to topology store for VLAN clicks from the topology view
   const topoVlanId = useTopologyStore((s) => s.selectedVlanId)
 
-  // Priority: Host > Subnet > VLAN (sidebar or topology) > Tunnel > Site
+  // Priority: Host > DHCP Pool > Subnet > VLAN (sidebar or topology) > Tunnel > Site
   const activeView = selectedHostId
     ? 'host'
-    : selectedSubnetId
-      ? 'subnet'
-      : (selectedVlanId || topoVlanId)
-        ? 'vlan'
-        : selectedTunnelId
-          ? 'tunnel'
-          : selectedSiteId
-            ? 'site'
-            : null
+    : selectedDhcpPoolId
+      ? 'dhcpPool'
+      : selectedSubnetId
+        ? 'subnet'
+        : (selectedVlanId || topoVlanId)
+          ? 'vlan'
+          : selectedTunnelId
+            ? 'tunnel'
+            : selectedSiteId
+              ? 'site'
+              : null
 
   const effectiveVlanId = selectedVlanId || topoVlanId
 
@@ -72,6 +76,9 @@ export function DetailPanel({ className }: { className?: string }) {
       )}
       {activeView === 'host' && selectedHostId && (
         <HostDetail hostId={selectedHostId} />
+      )}
+      {activeView === 'dhcpPool' && selectedDhcpPoolId && (
+        <DHCPPoolDetail poolId={selectedDhcpPoolId} />
       )}
       {!activeView && (
         <div className="p-3 text-xs text-muted-foreground">
@@ -224,6 +231,7 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
   const queryClient = useQueryClient()
   const [editOpen, setEditOpen] = useState(false)
   const [addHostOpen, setAddHostOpen] = useState(false)
+  const [addPoolOpen, setAddPoolOpen] = useState(false)
 
   const { data: subnet } = useQuery({
     queryKey: ['subnet', subnetId],
@@ -234,6 +242,12 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
   const { data: hostsData } = useQuery({
     queryKey: ['hosts', { subnet: subnetId }],
     queryFn: () => hostsApi.list({ subnet: String(subnetId) }),
+    select: (res) => res.data.results,
+  })
+
+  const { data: dhcpPoolsData } = useQuery({
+    queryKey: ['dhcp-pools', { subnet: subnetId }],
+    queryFn: () => dhcpPoolsApi.list({ subnet: String(subnetId) }),
     select: (res) => res.data.results,
   })
 
@@ -248,6 +262,7 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
   })
 
   const hosts = hostsData ?? []
+  const dhcpPools = dhcpPoolsData ?? []
 
   if (!subnet) return <DetailLoading />
 
@@ -280,6 +295,35 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
         <HostList hosts={hosts} />
       </div>
 
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+            DHCP Pools ({dhcpPools.length})
+          </h4>
+          <button
+            onClick={() => setAddPoolOpen(true)}
+            className="text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            <Plus className="h-3 w-3" /> Pool
+          </button>
+        </div>
+        <div className="space-y-1">
+          {dhcpPools.map((pool) => (
+            <div
+              key={pool.id}
+              onClick={() => useSelectionStore.getState().setSelectedDhcpPool(pool.id)}
+              className="flex w-full items-center justify-between rounded-md border border-border p-2 text-xs hover:bg-accent/50 transition-colors cursor-pointer"
+            >
+              <span className="font-mono">{pool.start_ip.split('/')[0]} – {pool.end_ip.split('/')[0]}</span>
+              <span className="text-[10px] text-muted-foreground">{pool.lease_count} leases</span>
+            </div>
+          ))}
+          {dhcpPools.length === 0 && (
+            <p className="text-xs text-muted-foreground">No DHCP pools</p>
+          )}
+        </div>
+      </div>
+
       <DetailActions
         onEdit={() => setEditOpen(true)}
         onDelete={() => {
@@ -299,6 +343,10 @@ function SubnetDetail({ subnetId }: { subnetId: number }) {
 
       <Dialog open={addHostOpen} onOpenChange={setAddHostOpen} title="Add Host">
         <HostForm subnetId={subnetId} onClose={() => setAddHostOpen(false)} />
+      </Dialog>
+
+      <Dialog open={addPoolOpen} onOpenChange={setAddPoolOpen} title="Add DHCP Pool">
+        <DHCPPoolForm subnetId={subnetId} onClose={() => setAddPoolOpen(false)} />
       </Dialog>
     </div>
   )
@@ -425,6 +473,95 @@ function HostDetail({ hostId }: { hostId: number }) {
 
       <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Host">
         <HostForm subnetId={host.subnet} host={host} onClose={() => setEditOpen(false)} />
+      </Dialog>
+    </div>
+  )
+}
+
+// ── DHCP Pool Detail ──────────────────────────────────────────
+
+function DHCPPoolDetail({ poolId }: { poolId: number }) {
+  const queryClient = useQueryClient()
+  const [editOpen, setEditOpen] = useState(false)
+  const [addHostOpen, setAddHostOpen] = useState(false)
+
+  const { data: pool } = useQuery({
+    queryKey: ['dhcp-pool', poolId],
+    queryFn: () => dhcpPoolsApi.get(poolId),
+    select: (res) => res.data,
+  })
+
+  const { data: hostsData } = useQuery({
+    queryKey: ['hosts', { dhcp_pool: poolId }],
+    queryFn: () => hostsApi.list({ dhcp_pool: String(poolId) }),
+    select: (res) => res.data.results,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => dhcpPoolsApi.delete(poolId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] })
+      queryClient.invalidateQueries({ queryKey: ['topology'] })
+      useSelectionStore.getState().setSelectedDhcpPool(null)
+      toast.success('DHCP Pool deleted')
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to delete'
+      toast.error(message)
+    },
+  })
+
+  const hosts = hostsData ?? []
+
+  if (!pool) return <DetailLoading />
+
+  return (
+    <div className="p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Layers className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-semibold font-mono">
+          {pool.start_ip.split('/')[0]} – {pool.end_ip.split('/')[0]}
+        </span>
+      </div>
+
+      <dl className="space-y-1.5 text-xs">
+        <DetailRow label="Leases" value={String(hosts.length)} />
+        {pool.description && <DetailRow label="Description" value={pool.description} />}
+      </dl>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+            Leases ({hosts.length})
+          </h4>
+          <button
+            onClick={() => setAddHostOpen(true)}
+            className="text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            <Plus className="h-3 w-3" /> Lease
+          </button>
+        </div>
+        <HostList hosts={hosts} />
+      </div>
+
+      <DetailActions
+        onEdit={() => setEditOpen(true)}
+        onDelete={() => {
+          if (window.confirm('Delete this DHCP pool?')) deleteMutation.mutate()
+        }}
+      />
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit DHCP Pool">
+        <DHCPPoolForm subnetId={pool.subnet} pool={pool} onClose={() => setEditOpen(false)} />
+      </Dialog>
+
+      <Dialog open={addHostOpen} onOpenChange={setAddHostOpen} title="Add DHCP Lease">
+        <HostForm
+          subnetId={pool.subnet}
+          defaultIpType="dhcp_lease"
+          defaultDhcpPoolId={pool.id}
+          onClose={() => setAddHostOpen(false)}
+        />
       </Dialog>
     </div>
   )
