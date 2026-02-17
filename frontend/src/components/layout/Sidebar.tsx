@@ -235,18 +235,21 @@ function ProjectTreeItem({
           {sites.map((site) => (
             <SiteTreeItem key={site.id} site={site} projectId={project.id} />
           ))}
-          {tunnels.length > 0 && (
-            <>
-              <div className="px-1.5 pt-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Tunnels
-                </span>
-              </div>
-              {tunnels.map((tunnel) => (
-                <TunnelTreeItem key={tunnel.id} tunnel={tunnel} projectId={project.id} />
-              ))}
-            </>
-          )}
+          <div className="group/section flex items-center justify-between px-1.5 pt-1">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              Tunnels{tunnels.length > 0 && ` (${tunnels.length})`}
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setAddTunnelOpen(true) }}
+              className="p-0.5 rounded hover:bg-accent opacity-0 group-hover/section:opacity-100 transition-opacity shrink-0"
+              title="Add tunnel"
+            >
+              <Plus className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </div>
+          {tunnels.map((tunnel) => (
+            <TunnelTreeItem key={tunnel.id} tunnel={tunnel} projectId={project.id} />
+          ))}
         </div>
       )}
 
@@ -354,18 +357,21 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
           {vlans.map((vlan) => (
             <VlanTreeItem key={vlan.id} vlan={vlan} siteId={site.id} />
           ))}
-          {standaloneSubnets && standaloneSubnets.length > 0 && (
-            <>
-              <div className="px-1.5 pt-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Subnets
-                </span>
-              </div>
-              {standaloneSubnets.map((subnet) => (
-                <SubnetTreeItem key={subnet.id} subnet={subnet} />
-              ))}
-            </>
-          )}
+          <div className="group/section flex items-center justify-between px-1.5 pt-1">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              Subnets{standaloneSubnets && standaloneSubnets.length > 0 && ` (${standaloneSubnets.length})`}
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setAddStandaloneSubnetOpen(true) }}
+              className="p-0.5 rounded hover:bg-accent opacity-0 group-hover/section:opacity-100 transition-opacity shrink-0"
+              title="Add subnet"
+            >
+              <Plus className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </div>
+          {standaloneSubnets?.map((subnet) => (
+            <SubnetTreeItem key={subnet.id} subnet={subnet} />
+          ))}
         </div>
       )}
 
