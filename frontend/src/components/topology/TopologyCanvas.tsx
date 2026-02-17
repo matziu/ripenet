@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -151,26 +151,35 @@ function TopologyCanvasInner({ projectId }: TopologyCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
+  // Ref always tracks the latest nodes for reliable position saving
+  const nodesRef = useRef(nodes)
+  nodesRef.current = nodes
+
   useEffect(() => {
     setNodes(initialNodes)
     setEdges(initialEdges)
-    // Persist positions after every layout computation (dagre or position restore)
-    // so that expand/collapse doesn't lose the current arrangement
-    if (initialNodes.length > 0) {
-      savePositions(projectId, initialNodes)
-    }
-  }, [initialNodes, initialEdges, setNodes, setEdges, projectId])
+  }, [initialNodes, initialEdges, setNodes, setEdges])
 
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
       onNodesChange(changes)
+      // Save positions on every drag position change to keep localStorage in sync
+      const hasPositionChange = changes.some(
+        (c) => c.type === 'position' && !c.dragging && c.position,
+      )
+      if (hasPositionChange) {
+        // Use rAF to read nodes after React applies the changes
+        requestAnimationFrame(() => {
+          savePositions(projectId, nodesRef.current)
+        })
+      }
     },
-    [onNodesChange],
+    [onNodesChange, projectId],
   )
 
   const onNodeDragStop = useCallback(() => {
-    savePositions(projectId, nodes)
-  }, [projectId, nodes])
+    savePositions(projectId, nodesRef.current)
+  }, [projectId])
 
   const handleRelayout = useCallback(() => {
     setLayoutKey((k) => k + 1)

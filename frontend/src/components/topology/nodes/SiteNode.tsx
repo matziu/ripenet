@@ -1,4 +1,4 @@
-import { memo, useRef } from 'react'
+import { memo, useRef, useState, useEffect } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
 import { useNavigate } from 'react-router-dom'
@@ -78,16 +78,37 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
   const navigate = useNavigate()
   const isVirtual = d.isExternal || d.isCrossProject
 
-  // Cache vlans/subnets for collapse animation (so content stays visible during grid-rows transition)
+  // ── Expand/collapse animation state ──
+  const [isOpen, setIsOpen] = useState(d.expanded)
+  const [shouldRender, setShouldRender] = useState(d.expanded)
+
+  // Cache vlans/subnets so content stays visible during collapse animation
   const cachedVlansRef = useRef(d.vlans)
   const cachedStandaloneRef = useRef(d.standaloneSubnets)
   if (d.vlans.length > 0) {
     cachedVlansRef.current = d.vlans
     cachedStandaloneRef.current = d.standaloneSubnets
   }
-  const displayVlans = d.expanded ? d.vlans : cachedVlansRef.current
-  const displayStandalone = d.expanded ? d.standaloneSubnets : cachedStandaloneRef.current
-  const hasContent = (displayVlans?.length ?? 0) > 0 || (displayStandalone?.length ?? 0) > 0
+
+  const displayVlans = d.vlans.length > 0 ? d.vlans : cachedVlansRef.current
+  const displayStandalone = d.standaloneSubnets.length > 0 ? d.standaloneSubnets : cachedStandaloneRef.current
+  const hasAnyContent = displayVlans.length > 0 || (displayStandalone?.length ?? 0) > 0
+
+  useEffect(() => {
+    if (d.expanded) {
+      // Expand: render grid at 0fr first, then animate to 1fr on next frame
+      setShouldRender(true)
+      const raf = requestAnimationFrame(() => {
+        setIsOpen(true)
+      })
+      return () => cancelAnimationFrame(raf)
+    } else {
+      // Collapse: animate 1fr → 0fr, then remove from DOM
+      setIsOpen(false)
+      const timer = setTimeout(() => setShouldRender(false), 320)
+      return () => clearTimeout(timer)
+    }
+  }, [d.expanded])
 
   const handleSiteClick = () => {
     if (d.isCrossProject && d.crossProjectId) {
@@ -214,19 +235,18 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
       )}
 
       {/* Animated expand/collapse using CSS grid-template-rows */}
-      {hasContent && (
+      {shouldRender && hasAnyContent && (
         <div
           style={{
             display: 'grid',
-            gridTemplateRows: d.expanded ? '1fr' : '0fr',
-            opacity: d.expanded ? 1 : 0,
-            transition: 'grid-template-rows 300ms cubic-bezier(0.4,0,0.2,1), opacity 250ms ease',
+            gridTemplateRows: isOpen ? '1fr' : '0fr',
+            transition: 'grid-template-rows 300ms cubic-bezier(0.4,0,0.2,1)',
           }}
         >
           <div style={{ overflow: 'hidden' }}>
             <div className="px-3 pb-3 space-y-1 border-t border-border/30 pt-2 mt-0.5">
               {displayVlans.map((vlan, i) => (
-                <VlanRow key={vlan.id} vlan={vlan} index={d.expanded ? i : -1} />
+                <VlanRow key={vlan.id} vlan={vlan} index={isOpen ? i : -1} />
               ))}
               {displayStandalone && displayStandalone.length > 0 && (
                 <>
@@ -240,9 +260,9 @@ export const SiteNode = memo(function SiteNode({ data, id }: NodeProps) {
                       key={i}
                       className={cn(
                         'flex items-center gap-2 rounded-md px-2 py-1 bg-gray-500/10 border border-gray-500/20',
-                        d.expanded && 'opacity-0 animate-[vlan-slide-in_0.25s_ease-out_forwards]',
+                        isOpen && 'opacity-0 animate-[vlan-slide-in_0.25s_ease-out_forwards]',
                       )}
-                      style={d.expanded ? { animationDelay: `${(displayVlans.length + i) * 30}ms` } : undefined}
+                      style={isOpen ? { animationDelay: `${(displayVlans.length + i) * 30}ms` } : undefined}
                     >
                       <div className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
                       <span className="text-[11px] font-mono text-muted-foreground">{sub.network}</span>
