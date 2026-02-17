@@ -464,7 +464,7 @@ export function topologyToFlow(
     if (tunnel.external_endpoint) {
       edgeData.externalEndpoint = tunnel.external_endpoint
     }
-    if (tunnel.site_b_project_id && tunnel.site_b_project_name) {
+    if (tunnel.site_b_project_id && tunnel.site_b_project_name && tunnel.site_b_project_id !== tunnel.project) {
       edgeData.crossProjectName = `${tunnel.site_b_project_name} / ${tunnel.site_b_name}`
       edgeData.crossProjectId = tunnel.site_b_project_id
     }
