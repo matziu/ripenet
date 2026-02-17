@@ -70,3 +70,58 @@ def check_ip_in_subnet(ip_address, subnet_network):
         raise ValidationError(
             f"IP {ip_address} is not within subnet {subnet_network}"
         )
+
+
+def check_pool_range_in_subnet(start_ip, end_ip, subnet_network):
+    """Validate that start_ip and end_ip both fall within subnet_network, and start < end."""
+    start = ipaddress.ip_address(str(start_ip).split("/")[0])
+    end = ipaddress.ip_address(str(end_ip).split("/")[0])
+    net = ipaddress.ip_network(str(subnet_network), strict=False)
+
+    if start not in net:
+        raise ValidationError(f"Start IP {start_ip} is not within subnet {subnet_network}")
+    if end not in net:
+        raise ValidationError(f"End IP {end_ip} is not within subnet {subnet_network}")
+    if start >= end:
+        raise ValidationError(f"Start IP must be less than End IP ({start_ip} >= {end_ip})")
+
+
+def check_pool_overlap(start_ip, end_ip, subnet, exclude_pk=None):
+    """Ensure no other DHCP pool in this subnet overlaps with [start_ip, end_ip]."""
+    from .models import DHCPPool
+
+    start = int(ipaddress.ip_address(str(start_ip).split("/")[0]))
+    end = int(ipaddress.ip_address(str(end_ip).split("/")[0]))
+
+    for pool in subnet.dhcp_pools.exclude(pk=exclude_pk):
+        p_start = int(ipaddress.ip_address(str(pool.start_ip).split("/")[0]))
+        p_end = int(ipaddress.ip_address(str(pool.end_ip).split("/")[0]))
+        if start <= p_end and end >= p_start:
+            raise ValidationError(
+                f"Range {start_ip}-{end_ip} overlaps with existing pool {pool.start_ip}-{pool.end_ip}"
+            )
+
+
+def check_static_ip_not_in_pool(ip_address, subnet):
+    """For static hosts: IP must not fall within any DHCP pool in the subnet."""
+    ip_int = int(ipaddress.ip_address(str(ip_address).split("/")[0]))
+
+    for pool in subnet.dhcp_pools.all():
+        p_start = int(ipaddress.ip_address(str(pool.start_ip).split("/")[0]))
+        p_end = int(ipaddress.ip_address(str(pool.end_ip).split("/")[0]))
+        if p_start <= ip_int <= p_end:
+            raise ValidationError(
+                f"Static IP {ip_address} falls within DHCP pool {pool.start_ip}-{pool.end_ip}"
+            )
+
+
+def check_lease_ip_in_pool(ip_address, dhcp_pool):
+    """For DHCP lease hosts: IP must be within the assigned pool's range."""
+    ip_int = int(ipaddress.ip_address(str(ip_address).split("/")[0]))
+    p_start = int(ipaddress.ip_address(str(dhcp_pool.start_ip).split("/")[0]))
+    p_end = int(ipaddress.ip_address(str(dhcp_pool.end_ip).split("/")[0]))
+
+    if not (p_start <= ip_int <= p_end):
+        raise ValidationError(
+            f"Lease IP {ip_address} is not within pool range {dhcp_pool.start_ip}-{dhcp_pool.end_ip}"
+        )
