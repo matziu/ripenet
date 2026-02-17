@@ -20,6 +20,7 @@ import {
   FolderOpen, MapPin, Network, Server, Monitor,
   ChevronRight, ChevronDown, Plus,
   Pencil, Trash2, Cable,
+  ChevronsUpDown, ChevronsDownUp,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -39,7 +40,11 @@ export function Sidebar({ className, style }: SidebarProps) {
   const navigate = useNavigate()
   const { projectId } = useParams()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const setSelectedProject = useSelectionStore((s) => s.setSelectedProject)
+  const expandAll = useSelectionStore((s) => s.expandAll)
+  const collapseAll = useSelectionStore((s) => s.collapseAll)
+  const expandedProjectIds = useSelectionStore((s) => s.expandedProjectIds)
   const closeMobile = useCloseSidebarOnMobile()
 
   // Derive view suffix from current URL to preserve it when switching projects
@@ -55,6 +60,29 @@ export function Sidebar({ className, style }: SidebarProps) {
 
   const projects = projectsData ?? []
 
+  const hasAnyExpanded = expandedProjectIds.size > 0
+
+  const handleExpandAll = async () => {
+    if (!projectId) return
+    const pid = Number(projectId)
+    try {
+      const topo = await queryClient.ensureQueryData({
+        queryKey: ['topology', pid],
+        queryFn: () => projectsApi.topology(pid),
+      })
+      const data = topo.data
+      const siteIds = data.sites.map((s: { id: number }) => s.id)
+      const vlanIds = data.sites.flatMap((s: { vlans: { id: number }[] }) => s.vlans.map((v) => v.id))
+      const subnetIds = data.sites.flatMap((s: { vlans: { subnets: { id: number }[] }[] }) =>
+        s.vlans.flatMap((v) => v.subnets.map((sub) => sub.id)),
+      )
+      expandAll([pid], siteIds, vlanIds, subnetIds)
+    } catch {
+      // Fallback: just expand the project
+      expandAll([pid], [], [], [])
+    }
+  }
+
   return (
     <aside className={cn('border-r border-border bg-card overflow-y-auto overflow-x-hidden shrink-0', className)} style={style}>
       <div className="p-3">
@@ -65,13 +93,26 @@ export function Sidebar({ className, style }: SidebarProps) {
           >
             Projects
           </button>
-          <button
-            onClick={() => navigate('/projects')}
-            className="p-1 rounded hover:bg-accent"
-            title="All projects"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={hasAnyExpanded ? collapseAll : handleExpandAll}
+              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              title={hasAnyExpanded ? 'Collapse all' : 'Expand all'}
+            >
+              {hasAnyExpanded ? (
+                <ChevronsDownUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+              )}
+            </button>
+            <button
+              onClick={() => navigate('/projects')}
+              className="p-1 rounded hover:bg-accent"
+              title="All projects"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
         <nav className="space-y-0.5">
