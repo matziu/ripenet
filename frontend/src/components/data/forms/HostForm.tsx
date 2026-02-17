@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { hostsApi, subnetsApi, dhcpPoolsApi } from '@/api/endpoints'
+import { extractApiError } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Host } from '@/types'
 
@@ -103,14 +104,15 @@ export function HostForm({ subnetId, projectId, host, defaultIpType, defaultDhcp
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hosts'] })
+      queryClient.invalidateQueries({ queryKey: ['subnets'] })
       queryClient.invalidateQueries({ queryKey: ['topology'] })
       queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] })
+      queryClient.invalidateQueries({ queryKey: ['nextFreeIp'] })
       toast.success(host ? 'Host updated' : 'Host created')
       onClose()
     },
     onError: (err: unknown) => {
-      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to save host'
-      toast.error(message)
+      toast.error(extractApiError(err, 'Failed to save host'))
     },
   })
 

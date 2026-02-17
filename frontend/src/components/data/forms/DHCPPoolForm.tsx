@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { dhcpPoolsApi, subnetsApi } from '@/api/endpoints'
+import { extractApiError } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DHCPPool } from '@/types'
 
@@ -30,28 +31,6 @@ function ipToInt(ip: string): number | null {
   return result >>> 0
 }
 
-function extractApiError(err: unknown): string {
-  const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
-  if (!data) return 'Failed to save DHCP pool'
-
-  if (typeof data === 'string') return data
-  if (data.detail && typeof data.detail === 'string') return data.detail
-  if (data.non_field_errors && Array.isArray(data.non_field_errors))
-    return data.non_field_errors.join('. ')
-
-  // Field-level errors
-  const messages: string[] = []
-  for (const [key, value] of Object.entries(data)) {
-    if (Array.isArray(value)) {
-      messages.push(`${value.join(', ')}`)
-    } else if (typeof value === 'string') {
-      messages.push(`${key}: ${value}`)
-    }
-  }
-  if (messages.length > 0) return messages.join('. ')
-
-  return 'Failed to save DHCP pool'
-}
 
 export function DHCPPoolForm({ subnetId, pool, onClose }: DHCPPoolFormProps) {
   const queryClient = useQueryClient()
@@ -109,7 +88,7 @@ export function DHCPPoolForm({ subnetId, pool, onClose }: DHCPPoolFormProps) {
       onClose()
     },
     onError: (err: unknown) => {
-      toast.error(extractApiError(err))
+      toast.error(extractApiError(err, 'Failed to save DHCP pool'))
     },
   })
 
