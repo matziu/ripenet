@@ -509,6 +509,7 @@ function DHCPPoolDetail({ poolId }: { poolId: number }) {
     mutationFn: () => dhcpPoolsApi.delete(poolId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] })
+      queryClient.invalidateQueries({ queryKey: ['subnets'] })
       queryClient.invalidateQueries({ queryKey: ['topology'] })
       useSelectionStore.getState().setSelectedDhcpPool(null)
       toast.success('DHCP Pool deleted')

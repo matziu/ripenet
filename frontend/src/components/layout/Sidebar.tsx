@@ -683,6 +683,7 @@ function DHCPPoolTreeItem({ pool, closeMobile }: {
     mutationFn: () => dhcpPoolsApi.delete(pool.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] })
+      queryClient.invalidateQueries({ queryKey: ['subnets'] })
       queryClient.invalidateQueries({ queryKey: ['topology'] })
       toast.success('DHCP Pool deleted')
     },

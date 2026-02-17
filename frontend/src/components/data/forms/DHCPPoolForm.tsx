@@ -102,6 +102,7 @@ export function DHCPPoolForm({ subnetId, pool, onClose }: DHCPPoolFormProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] })
+      queryClient.invalidateQueries({ queryKey: ['subnets'] })
       queryClient.invalidateQueries({ queryKey: ['topology'] })
       queryClient.invalidateQueries({ queryKey: ['suggestedPoolRange'] })
       toast.success(pool ? 'DHCP Pool updated' : 'DHCP Pool created')

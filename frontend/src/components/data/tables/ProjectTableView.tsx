@@ -207,7 +207,7 @@ function NetworkHierarchy({ projectId }: { projectId: number }) {
   })
   const deleteDhcpPool = useMutation({
     mutationFn: (id: number) => dhcpPoolsApi.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] }); queryClient.invalidateQueries({ queryKey: ['topology'] }) },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['dhcp-pools'] }); queryClient.invalidateQueries({ queryKey: ['subnets'] }); queryClient.invalidateQueries({ queryKey: ['topology'] }) },
   })
 
   const totalHosts = hosts?.length ?? 0
