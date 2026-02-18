@@ -6,7 +6,7 @@ Web application for managing IP address infrastructure: projects, sites, VLANs, 
 
 - **Backend:** Django 5 + Django REST Framework, PostgreSQL 16 (native CIDR/INET types via django-netfields)
 - **Frontend:** React 19 + TypeScript, Vite, Tailwind CSS 4, TanStack Query, Zustand
-- **Infrastructure:** Docker Compose, Redis (caching), Nginx
+- **Infrastructure:** Docker Compose, Redis (caching)
 
 ## Features
 
@@ -68,7 +68,7 @@ The `.env` file contains database credentials and the admin password. Default va
 ### 3. Start the app
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker compose up --build
 ```
 
 This single command starts everything: PostgreSQL, Redis, Django backend, and the Vite frontend dev server. On first run it will also download Docker images (~1 min), run database migrations, create an admin user, and load sample network data.
@@ -91,7 +91,7 @@ Go to **http://localhost:3000** in your browser and log in:
 Press `Ctrl+C`, then run:
 
 ```bash
-docker compose -f docker-compose.dev.yml down
+docker compose down
 ```
 
 ### Starting again (after first setup)
@@ -99,21 +99,8 @@ docker compose -f docker-compose.dev.yml down
 You don't need to rebuild each time:
 
 ```bash
-docker compose -f docker-compose.dev.yml up
+docker compose up
 ```
-
-## Production
-
-```bash
-cp .env.example .env
-# Edit .env - set a strong DJANGO_SECRET_KEY and POSTGRES_PASSWORD
-docker compose up --build -d
-```
-
-This runs:
-- Backend with Gunicorn behind Nginx
-- Frontend as a static build served by Nginx on port 3000
-- PostgreSQL and Redis
 
 ## Environment Variables
 
@@ -149,8 +136,6 @@ frontend/
     types/       # TypeScript interfaces
 docker/
   Dockerfile.backend
-  Dockerfile.frontend
-  nginx.conf
   entrypoint.dev.sh
   init-extensions.sql
 ```
