@@ -42,74 +42,53 @@ Web application for managing IP address infrastructure: projects, sites, VLANs, 
 ### Topology view (dark mode)
 ![Topology view dark](docs/screenshots/topology-dark.png)
 
-## Requirements
+## Quick Start
 
-- [Docker](https://docs.docker.com/get-docker/) (includes Docker Compose)
-
-## Quick Start (step by step)
-
-### 1. Clone the repository
+The only requirement is [Docker](https://docs.docker.com/get-docker/) (includes Docker Compose).
 
 ```bash
 git clone https://github.com/matziu/ripenet.git
 cd ripenet
-```
-
-### 2. Create the environment file
-
-Copy the example file and adjust values if needed:
-
-```bash
-cp .env.example .env
-```
-
-The `.env` file contains database credentials and the admin password. Default values work out of the box for local development - you only need to change them for production.
-
-### 3. Start the app
-
-```bash
 docker compose up --build
 ```
 
-This single command starts everything: PostgreSQL, Redis, Django backend, and the Vite frontend dev server. On first run it will also download Docker images (~1 min), run database migrations, create an admin user, and load sample network data.
+That's it. This starts PostgreSQL, Redis, Django backend, and the Vite frontend. On first run it will download Docker images (~1 min), run database migrations, create an admin user, and load sample network data.
 
-Wait until you see `Local: http://localhost:3000` in the frontend container output.
-
-### 4. Open the app
-
-Go to **http://localhost:3000** in your browser and log in:
+Wait until you see `Local: http://localhost:3000` in the output, then open **http://localhost:3000** and log in:
 
 | Field    | Value   |
 |----------|---------|
 | Username | `admin` |
 | Password | `admin` |
 
-(or whatever you set as `DJANGO_ADMIN_PASSWORD` in your `.env` file)
+### Stopping
 
-### Stopping the app
-
-Press `Ctrl+C`, then run:
+Press `Ctrl+C`, then:
 
 ```bash
 docker compose down
 ```
 
-### Starting again (after first setup)
-
-You don't need to rebuild each time:
+### Starting again
 
 ```bash
 docker compose up
 ```
 
-## Environment Variables
+### Custom configuration (optional)
+
+To change database credentials or admin password, copy the example file and edit it:
+
+```bash
+cp .env.example .env
+```
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `POSTGRES_DB` | Database name | `ripenet` |
 | `POSTGRES_USER` | Database user | `ripenet` |
 | `POSTGRES_PASSWORD` | Database password | `ripenet` |
-| `DJANGO_SECRET_KEY` | Django secret key | `change-me-to-a-random-string` |
+| `DJANGO_SECRET_KEY` | Django secret key | auto-generated |
 | `DJANGO_ADMIN_PASSWORD` | Initial admin password | `admin` |
 
 ## Project Structure
@@ -123,13 +102,13 @@ backend/
     ipam/        # VLANs, subnets, hosts, DHCP pools, tunnels
     projects/    # Projects, sites, topology endpoint
     search/      # Global search
-    templates/   # Project templates (pre-configured network layouts)
+    templates/   # Project templates
   config/        # Django settings, root URLs
 frontend/
   src/
     api/         # Axios client, API endpoints
     components/  # UI components, forms, layout
-    hooks/       # React Query hooks (queries, mutations)
+    hooks/       # React Query hooks
     lib/         # Utilities, topology graph logic
     pages/       # Route pages
     stores/      # Zustand stores (UI, selection, topology)
@@ -142,17 +121,24 @@ docker/
 
 ## API
 
-REST API at `/api/v1/` with endpoints:
+REST API at `/api/v1/`:
 
-- `/auth/login/`, `/auth/logout/`, `/auth/me/`
-- `/projects/`, `/projects/{id}/sites/`, `/projects/{id}/topology/`
-- `/vlans/`, `/subnets/`, `/hosts/`, `/dhcp-pools/`, `/tunnels/`
-- `/subnets/{id}/next-free-ip/`, `/subnets/{id}/suggested-pool-range/`
-- `/tools/subnet-info/`, `/tools/vlsm/`
-- `/search/?q=...`
-- `/audit/` (change log)
-- `/exports/project/{id}/pdf/`, `/exports/project/{id}/excel/`
-- `/users/` (admin only)
+| Endpoint | Description |
+|----------|-------------|
+| `/auth/login/`, `/auth/logout/`, `/auth/me/` | Authentication |
+| `/projects/` | Projects CRUD |
+| `/projects/{id}/sites/` | Sites per project |
+| `/projects/{id}/topology/` | Project topology tree |
+| `/vlans/`, `/subnets/`, `/hosts/` | Network resources CRUD |
+| `/dhcp-pools/`, `/tunnels/` | DHCP pools and tunnels CRUD |
+| `/subnets/{id}/next-free-ip/` | Next available IP in subnet |
+| `/subnets/{id}/suggested-pool-range/` | Suggested DHCP pool range |
+| `/tools/subnet-info/`, `/tools/vlsm/` | Subnet calculator, VLSM tool |
+| `/search/?q=...` | Global search |
+| `/audit/` | Change log |
+| `/exports/project/{id}/pdf/` | PDF export |
+| `/exports/project/{id}/excel/` | Excel export |
+| `/users/` | User management (admin only) |
 
 ## License
 
