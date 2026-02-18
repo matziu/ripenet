@@ -136,7 +136,7 @@ frontend/
     types/       # TypeScript interfaces
 docker/
   Dockerfile.backend
-  entrypoint.dev.sh
+  entrypoint.sh
   init-extensions.sql
 ```
 

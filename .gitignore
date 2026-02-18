@@ -13,7 +13,6 @@ venv/
 # Django
 backend/staticfiles/
 backend/media/
-backend/.env
 *.sqlite3
 
 # Environment
@@ -22,7 +21,6 @@ backend/.env
 # Node
 node_modules/
 frontend/dist/
-frontend/.env
 
 # IDE
 .idea/
@@ -37,28 +35,8 @@ Thumbs.db
 # Docker
 *.log
 
-# Coverage
+# Coverage / Testing
 .coverage
 htmlcov/
 .pytest_cache/
-
-# Test/debug scripts
-show-dbg.mjs
-test-browse.mjs
-test-wizard.mjs
-test-e2e-standalone.mjs
-
-# Test artifacts
-frontend/test-screenshots/
-frontend/test-results/
 test-results/
-
-# Working docs
-docs/plans/
-
-# Root-level Playwright deps
-/package.json
-/package-lock.json
-
-# Auto-generated
-frontend/README.md
