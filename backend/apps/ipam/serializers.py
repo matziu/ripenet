@@ -308,8 +308,8 @@ class DevicePortSerializer(serializers.ModelSerializer):
         return None
 
     def validate(self, attrs):
-        host = attrs.get("host")
-        patch_panel = attrs.get("patch_panel")
+        host = attrs.get("host", getattr(self.instance, "host", None) if self.instance else None)
+        patch_panel = attrs.get("patch_panel", getattr(self.instance, "patch_panel", None) if self.instance else None)
         if bool(host) == bool(patch_panel):
             raise serializers.ValidationError("Port must belong to exactly one of host or patch_panel.")
         return attrs
@@ -338,4 +338,16 @@ class CableSerializer(serializers.ModelSerializer):
         port_b = attrs.get("port_b") or (self.instance and self.instance.port_b)
         if port_a and port_b and port_a.id == port_b.id:
             raise serializers.ValidationError("Cannot connect a port to itself.")
+        exclude_pk = self.instance.pk if self.instance else None
+        from django.db import models as db_models
+        if port_a:
+            if Cable.objects.filter(
+                db_models.Q(port_a=port_a) | db_models.Q(port_b=port_a)
+            ).exclude(pk=exclude_pk).exists():
+                raise serializers.ValidationError({"port_a": "This port is already connected."})
+        if port_b:
+            if Cable.objects.filter(
+                db_models.Q(port_a=port_b) | db_models.Q(port_b=port_b)
+            ).exclude(pk=exclude_pk).exists():
+                raise serializers.ValidationError({"port_b": "This port is already connected."})
         return attrs
