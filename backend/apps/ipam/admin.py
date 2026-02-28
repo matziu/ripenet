@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import VLAN, Host, Subnet, Tunnel, DeviceType
+from .models import VLAN, Host, Subnet, Tunnel, DeviceType, PortTemplate, DevicePort, PatchPanel, Cable
 
 
 class SubnetInline(admin.TabularInline):
@@ -36,10 +36,16 @@ class HostAdmin(admin.ModelAdmin):
     search_fields = ("hostname", "description")
 
 
+class PortTemplateInline(admin.TabularInline):
+    model = PortTemplate
+    extra = 0
+
+
 @admin.register(DeviceType)
 class DeviceTypeAdmin(admin.ModelAdmin):
     list_display = ("value", "label", "position")
     ordering = ("position",)
+    inlines = [PortTemplateInline]
 
 
 @admin.register(Tunnel)
@@ -47,3 +53,15 @@ class TunnelAdmin(admin.ModelAdmin):
     list_display = ("name", "tunnel_type", "tunnel_subnet", "site_a", "site_b", "enabled")
     list_filter = ("tunnel_type", "enabled", "project")
     search_fields = ("name",)
+
+
+@admin.register(PatchPanel)
+class PatchPanelAdmin(admin.ModelAdmin):
+    list_display = ("name", "site", "port_count")
+    list_filter = ("site__project",)
+
+
+@admin.register(Cable)
+class CableAdmin(admin.ModelAdmin):
+    list_display = ("port_a", "port_b", "cable_type", "label")
+    list_filter = ("cable_type",)

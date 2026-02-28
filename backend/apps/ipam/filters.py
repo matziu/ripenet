@@ -1,6 +1,7 @@
 import django_filters
+from django.db import models
 
-from .models import Host, Subnet, Tunnel, VLAN, DHCPPool
+from .models import Host, Subnet, Tunnel, VLAN, DHCPPool, DevicePort, Cable, PatchPanel
 
 
 class VLANFilter(django_filters.FilterSet):
@@ -59,3 +60,42 @@ class DHCPPoolFilter(django_filters.FilterSet):
     class Meta:
         model = DHCPPool
         fields = ["project", "site", "subnet"]
+
+
+class DevicePortFilter(django_filters.FilterSet):
+    host = django_filters.NumberFilter(field_name="host_id")
+    patch_panel = django_filters.NumberFilter(field_name="patch_panel_id")
+    site = django_filters.NumberFilter(method="filter_by_site")
+
+    class Meta:
+        model = DevicePort
+        fields = ["host", "patch_panel"]
+
+    def filter_by_site(self, queryset, name, value):
+        return queryset.filter(
+            models.Q(host__subnet__site_id=value) | models.Q(patch_panel__site_id=value)
+        )
+
+
+class CableFilter(django_filters.FilterSet):
+    site = django_filters.NumberFilter(method="filter_by_site")
+
+    class Meta:
+        model = Cable
+        fields = ["cable_type"]
+
+    def filter_by_site(self, queryset, name, value):
+        return queryset.filter(
+            models.Q(port_a__host__subnet__site_id=value)
+            | models.Q(port_a__patch_panel__site_id=value)
+            | models.Q(port_b__host__subnet__site_id=value)
+            | models.Q(port_b__patch_panel__site_id=value)
+        ).distinct()
+
+
+class PatchPanelFilter(django_filters.FilterSet):
+    site = django_filters.NumberFilter(field_name="site_id")
+
+    class Meta:
+        model = PatchPanel
+        fields = ["site"]

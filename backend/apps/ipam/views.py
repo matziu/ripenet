@@ -9,12 +9,13 @@ from rest_framework.views import APIView
 
 from rest_framework.permissions import IsAuthenticated
 
-from .filters import HostFilter, SubnetFilter, TunnelFilter, VLANFilter, DHCPPoolFilter
-from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType
+from .filters import HostFilter, SubnetFilter, TunnelFilter, VLANFilter, DHCPPoolFilter, DevicePortFilter, CableFilter, PatchPanelFilter
+from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType, PortTemplate, DevicePort, PatchPanel, Cable
 from .permissions import IsAdmin, ProjectPermission
 from .serializers import (
     HostSerializer, SubnetSerializer, TunnelSerializer, VLANSerializer,
     DHCPPoolSerializer, DeviceTypeSerializer,
+    PortTemplateSerializer, DevicePortSerializer, PatchPanelSerializer, CableSerializer,
 )
 
 
@@ -258,6 +259,95 @@ class TunnelViewSet(viewsets.ModelViewSet):
         if project_pk:
             qs = qs.filter(project_id=project_pk)
         return qs
+
+
+class PortTemplateViewSet(viewsets.ModelViewSet):
+    serializer_class = PortTemplateSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdmin()]
+
+    def get_queryset(self):
+        return PortTemplate.objects.filter(device_type_id=self.kwargs["device_type_pk"])
+
+    def perform_create(self, serializer):
+        serializer.save(device_type_id=self.kwargs["device_type_pk"])
+
+    @action(detail=False, methods=["post"])
+    def apply(self, request, device_type_pk=None):
+        """Sync port templates to all existing hosts of this device type."""
+        dt = DeviceType.objects.get(pk=device_type_pk)
+        templates = dt.port_templates.all()
+        hosts = Host.objects.filter(device_type=dt.value)
+        created = 0
+        for host in hosts:
+            for tpl in templates:
+                _, was_created = DevicePort.objects.get_or_create(
+                    host=host, name=tpl.name,
+                    defaults={"port_type": tpl.port_type, "position": tpl.position},
+                )
+                if was_created:
+                    created += 1
+        return Response({"detail": f"Created {created} port(s) across {hosts.count()} host(s)."})
+
+
+class DevicePortViewSet(viewsets.ModelViewSet):
+    serializer_class = DevicePortSerializer
+    permission_classes = [ProjectPermission]
+    filterset_class = DevicePortFilter
+    pagination_class = None
+
+    def get_queryset(self):
+        return DevicePort.objects.select_related(
+            "host", "host__subnet", "host__subnet__site",
+            "patch_panel", "patch_panel__site",
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        port = self.get_object()
+        has_cable = Cable.objects.filter(Q(port_a=port) | Q(port_b=port)).exists()
+        if has_cable:
+            return Response(
+                {"detail": "Cannot delete port with connected cable. Remove cable first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+
+class PatchPanelViewSet(viewsets.ModelViewSet):
+    serializer_class = PatchPanelSerializer
+    permission_classes = [ProjectPermission]
+    filterset_class = PatchPanelFilter
+
+    def get_queryset(self):
+        return PatchPanel.objects.select_related("site", "site__project").prefetch_related("ports")
+
+    def destroy(self, request, *args, **kwargs):
+        pp = self.get_object()
+        cables = Cable.objects.filter(
+            Q(port_a__patch_panel=pp) | Q(port_b__patch_panel=pp)
+        )
+        if cables.exists():
+            return Response(
+                {"detail": "Cannot delete patch panel with connected cables."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+
+class CableViewSet(viewsets.ModelViewSet):
+    serializer_class = CableSerializer
+    permission_classes = [ProjectPermission]
+    filterset_class = CableFilter
+
+    def get_queryset(self):
+        return Cable.objects.select_related(
+            "port_a__host", "port_a__patch_panel",
+            "port_b__host", "port_b__patch_panel",
+        )
 
 
 class SubnetInfoView(APIView):
