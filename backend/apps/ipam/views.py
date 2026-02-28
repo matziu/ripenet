@@ -1,6 +1,6 @@
 import ipaddress
 
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.db.models.expressions import RawSQL
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
@@ -17,6 +17,7 @@ from .serializers import (
     HostSerializer, SubnetSerializer, TunnelSerializer, VLANSerializer,
     DHCPPoolSerializer, DeviceTypeSerializer,
     PortTemplateSerializer, DevicePortSerializer, PatchPanelSerializer, CableSerializer,
+    PhysicalHostSerializer, PhysicalPatchPanelSerializer, PhysicalCableSerializer,
 )
 
 
@@ -349,6 +350,38 @@ class CableViewSet(viewsets.ModelViewSet):
             "port_a__host", "port_a__patch_panel",
             "port_b__host", "port_b__patch_panel",
         )
+
+
+class PhysicalTopologyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_pk):
+        hosts = Host.objects.filter(
+            subnet__site_id=site_pk
+        ).select_related("subnet", "subnet__site").prefetch_related(
+            Prefetch("ports", queryset=DevicePort.objects.order_by("position")),
+        )
+        patch_panels = PatchPanel.objects.filter(
+            site_id=site_pk
+        ).prefetch_related(
+            Prefetch("ports", queryset=DevicePort.objects.order_by("position")),
+        )
+        # All cables touching this site (including cross-site)
+        site_port_ids = DevicePort.objects.filter(
+            Q(host__subnet__site_id=site_pk) | Q(patch_panel__site_id=site_pk)
+        ).values_list("id", flat=True)
+        cables = Cable.objects.filter(
+            Q(port_a_id__in=site_port_ids) | Q(port_b_id__in=site_port_ids)
+        ).select_related(
+            "port_a__host", "port_a__patch_panel", "port_a__host__subnet__site",
+            "port_b__host", "port_b__patch_panel", "port_b__host__subnet__site",
+        )
+
+        return Response({
+            "hosts": PhysicalHostSerializer(hosts, many=True).data,
+            "patch_panels": PhysicalPatchPanelSerializer(patch_panels, many=True).data,
+            "cables": PhysicalCableSerializer(cables, many=True).data,
+        })
 
 
 class SubnetInfoView(APIView):

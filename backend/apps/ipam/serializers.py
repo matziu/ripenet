@@ -351,3 +351,49 @@ class CableSerializer(serializers.ModelSerializer):
             ).exclude(pk=exclude_pk).exists():
                 raise serializers.ValidationError({"port_b": "This port is already connected."})
         return attrs
+
+
+# --- Physical topology serializers (read-only, for L1 view) ---
+
+class PhysicalPortSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DevicePort
+        fields = ["id", "name", "port_type", "position"]
+
+
+class PhysicalHostSerializer(serializers.ModelSerializer):
+    ports = PhysicalPortSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Host
+        fields = ["id", "ip_address", "hostname", "device_type", "ports"]
+
+
+class PhysicalPatchPanelSerializer(serializers.ModelSerializer):
+    ports = PhysicalPortSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PatchPanel
+        fields = ["id", "name", "ports"]
+
+
+class PhysicalCableSerializer(serializers.ModelSerializer):
+    port_a_device = serializers.SerializerMethodField()
+    port_b_device = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Cable
+        fields = ["id", "port_a", "port_b", "cable_type", "label", "port_a_device", "port_b_device"]
+
+    def _device_info(self, port):
+        if port.host:
+            return {"type": "host", "id": port.host.id, "name": port.host.hostname, "site_id": port.host.subnet.site_id}
+        if port.patch_panel:
+            return {"type": "patch_panel", "id": port.patch_panel.id, "name": port.patch_panel.name, "site_id": port.patch_panel.site_id}
+        return None
+
+    def get_port_a_device(self, obj):
+        return self._device_info(obj.port_a)
+
+    def get_port_b_device(self, obj):
+        return self._device_info(obj.port_b)

@@ -31,4 +31,9 @@ urlpatterns = [
         views.PortTemplateViewSet.as_view({"patch": "partial_update", "delete": "destroy"}),
         name="port-template-detail",
     ),
+    path(
+        "sites/<int:site_pk>/physical-topology/",
+        views.PhysicalTopologyView.as_view(),
+        name="physical-topology",
+    ),
 ]
