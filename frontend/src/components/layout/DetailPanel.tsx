@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui.store'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useTopologyStore } from '@/stores/topology.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi } from '@/api/endpoints'
+import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi, portsApi, patchPanelsApi, cablesApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
 import { cn } from '@/lib/utils'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
@@ -15,11 +15,11 @@ import { HostForm } from '@/components/data/forms/HostForm'
 import { DHCPPoolForm } from '@/components/data/forms/DHCPPoolForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { toast } from 'sonner'
-import type { Host } from '@/types'
+import type { Host, DevicePort, PatchPanel as PatchPanelType, Cable as CableType } from '@/types'
 import { useDeviceTypeLabel } from '@/hooks/useDeviceTypeLabel'
 import {
   X, Pencil, Trash2, Plus,
-  MapPin, Network, Server, Monitor, Cable, Layers,
+  MapPin, Network, Server, Monitor, Cable as CableIcon, Layers,
 } from 'lucide-react'
 
 export function DetailPanel({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -32,25 +32,31 @@ export function DetailPanel({ className, style }: { className?: string; style?: 
   const selectedHostId = useSelectionStore((s) => s.selectedHostId)
   const selectedTunnelId = useSelectionStore((s) => s.selectedTunnelId)
   const selectedDhcpPoolId = useSelectionStore((s) => s.selectedDhcpPoolId)
+  const selectedPatchPanelId = useSelectionStore((s) => s.selectedPatchPanelId)
+  const selectedCableId = useSelectionStore((s) => s.selectedCableId)
   const selectedProjectId = useSelectionStore((s) => s.selectedProjectId)
 
   // Also listen to topology store for VLAN clicks from the topology view
   const topoVlanId = useTopologyStore((s) => s.selectedVlanId)
 
-  // Priority: Host > DHCP Pool > Subnet > VLAN (sidebar or topology) > Tunnel > Site
+  // Priority: Host > Cable > PatchPanel > DHCP Pool > Subnet > VLAN > Tunnel > Site
   const activeView = selectedHostId
     ? 'host'
-    : selectedDhcpPoolId
-      ? 'dhcpPool'
-      : selectedSubnetId
-        ? 'subnet'
-        : (selectedVlanId || topoVlanId)
-          ? 'vlan'
-          : selectedTunnelId
-            ? 'tunnel'
-            : selectedSiteId
-              ? 'site'
-              : null
+    : selectedCableId
+      ? 'cable'
+      : selectedPatchPanelId
+        ? 'patchPanel'
+        : selectedDhcpPoolId
+          ? 'dhcpPool'
+          : selectedSubnetId
+            ? 'subnet'
+            : (selectedVlanId || topoVlanId)
+              ? 'vlan'
+              : selectedTunnelId
+                ? 'tunnel'
+                : selectedSiteId
+                  ? 'site'
+                  : null
 
   const effectiveVlanId = selectedVlanId || topoVlanId
 
@@ -77,6 +83,12 @@ export function DetailPanel({ className, style }: { className?: string; style?: 
       )}
       {activeView === 'host' && selectedHostId && (
         <HostDetail hostId={selectedHostId} />
+      )}
+      {activeView === 'cable' && selectedCableId && (
+        <CableDetail cableId={selectedCableId} />
+      )}
+      {activeView === 'patchPanel' && selectedPatchPanelId && (
+        <PatchPanelDetail patchPanelId={selectedPatchPanelId} />
       )}
       {activeView === 'dhcpPool' && selectedDhcpPoolId && (
         <DHCPPoolDetail poolId={selectedDhcpPoolId} />
@@ -380,7 +392,7 @@ function TunnelDetail({ tunnelId, projectId }: { tunnelId: number; projectId: nu
   return (
     <div className="p-3 space-y-3">
       <div className="flex items-center gap-2">
-        <Cable className="h-4 w-4 text-primary shrink-0" />
+        <CableIcon className="h-4 w-4 text-primary shrink-0" />
         <span className="text-sm font-semibold">{tunnel.name}</span>
       </div>
 
@@ -465,6 +477,8 @@ function HostDetail({ hostId }: { hostId: number }) {
         <DetailRow label="Device Type" value={getLabel(host.device_type)} />
         {host.description && <DetailRow label="Description" value={host.description} />}
       </dl>
+
+      <HostPortsSection hostId={hostId} />
 
       <DetailActions
         onEdit={() => setEditOpen(true)}
@@ -595,6 +609,171 @@ function DHCPPoolDetail({ poolId }: { poolId: number }) {
           onClose={() => setAddHostOpen(false)}
         />
       </Dialog>
+    </div>
+  )
+}
+
+// ── Host Ports Section ───────────────────────────────────────
+
+function HostPortsSection({ hostId }: { hostId: number }) {
+  const { data: ports } = useQuery({
+    queryKey: ['ports', { host: hostId }],
+    queryFn: () => portsApi.list({ host: String(hostId) }),
+    select: (res) => res.data,
+  })
+
+  if (!ports || ports.length === 0) return null
+
+  return (
+    <div>
+      <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+        Ports ({ports.length})
+      </h4>
+      <div className="space-y-1">
+        {ports.map((port) => (
+          <div
+            key={port.id}
+            className="flex items-center justify-between rounded-md border border-border p-2 text-xs"
+          >
+            <div>
+              <span className="font-mono">{port.name}</span>
+              <span className="text-muted-foreground ml-2">{port.port_type}</span>
+            </div>
+            <span className={port.cable ? 'text-emerald-500' : 'text-muted-foreground'}>
+              {port.cable ? port.cable.label || port.cable.cable_type : 'Free'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Patch Panel Detail ───────────────────────────────────────
+
+function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
+  const queryClient = useQueryClient()
+  const [editOpen, setEditOpen] = useState(false)
+
+  const { data: pp } = useQuery({
+    queryKey: ['patch-panel', patchPanelId],
+    queryFn: () => patchPanelsApi.get(patchPanelId),
+    select: (res) => res.data,
+  })
+
+  const { data: ports } = useQuery({
+    queryKey: ['ports', { patch_panel: patchPanelId }],
+    queryFn: () => portsApi.list({ patch_panel: String(patchPanelId) }),
+    select: (res) => res.data,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => patchPanelsApi.delete(patchPanelId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patch-panels'] })
+      useSelectionStore.getState().setSelectedPatchPanel(null)
+      toast.success('Patch panel deleted')
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to delete'
+      toast.error(message)
+    },
+  })
+
+  if (!pp) return <DetailLoading />
+
+  return (
+    <div className="p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Server className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-semibold">{pp.name}</span>
+      </div>
+
+      <dl className="space-y-1.5 text-xs">
+        <DetailRow label="Ports" value={`${pp.port_count_current} / ${pp.port_count}`} />
+        {pp.description && <DetailRow label="Description" value={pp.description} />}
+      </dl>
+
+      {ports && ports.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+            Ports ({ports.length})
+          </h4>
+          <div className="space-y-1">
+            {ports.map((port) => (
+              <div
+                key={port.id}
+                className="flex items-center justify-between rounded-md border border-border p-2 text-xs"
+              >
+                <div>
+                  <span className="font-mono">{port.name}</span>
+                  <span className="text-muted-foreground ml-2">{port.port_type}</span>
+                </div>
+                <span className={port.cable ? 'text-emerald-500' : 'text-muted-foreground'}>
+                  {port.cable ? port.cable.label || port.cable.cable_type : 'Free'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <DetailActions
+        onEdit={() => setEditOpen(false)}
+        onDelete={() => {
+          if (window.confirm(`Delete patch panel "${pp.name}"?`)) deleteMutation.mutate()
+        }}
+      />
+    </div>
+  )
+}
+
+// ── Cable Detail ─────────────────────────────────────────────
+
+function CableDetail({ cableId }: { cableId: number }) {
+  const queryClient = useQueryClient()
+
+  const { data: cable } = useQuery({
+    queryKey: ['cable', cableId],
+    queryFn: () => cablesApi.get(cableId),
+    select: (res) => res.data,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => cablesApi.delete(cableId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cables'] })
+      useSelectionStore.getState().setSelectedCable(null)
+      toast.success('Cable deleted')
+    },
+  })
+
+  if (!cable) return <DetailLoading />
+
+  return (
+    <div className="p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <CableIcon className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-semibold">{cable.label || cable.cable_type}</span>
+      </div>
+
+      <dl className="space-y-1.5 text-xs">
+        <DetailRow label="Type" value={cable.cable_type} />
+        {cable.label && <DetailRow label="Label" value={cable.label} />}
+        <DetailRow label="Port A" value={cable.port_a_display} />
+        <DetailRow label="Port B" value={cable.port_b_display} />
+      </dl>
+
+      <div className="flex gap-2 pt-1 border-t border-border">
+        <button
+          onClick={() => {
+            if (window.confirm('Delete this cable?')) deleteMutation.mutate()
+          }}
+          className="flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs text-red-500 hover:bg-red-500/10 transition-colors"
+        >
+          <Trash2 className="h-3 w-3" /> Delete
+        </button>
+      </div>
     </div>
   )
 }
