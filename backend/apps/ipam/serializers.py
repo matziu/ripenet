@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from apps.projects.models import Project, Site
 from apps.projects.serializers import SiteWanAddressSerializer
-from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType
+from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType, PortTemplate, DevicePort, PatchPanel, Cable
 from .validators import (
     check_ip_duplicate_in_project, check_ip_in_subnet, check_subnet_overlap,
     check_pool_range_in_subnet, check_pool_overlap, check_static_ip_not_in_pool, check_lease_ip_in_pool,
@@ -284,3 +284,58 @@ class ProjectTopologySerializer(serializers.Serializer):
     sites = SiteTopologySerializer(many=True, read_only=True)
     tunnels = TunnelTopologySerializer(many=True, read_only=True)
     standalone_subnets = SubnetTopologySerializer(many=True, read_only=True)
+
+
+class PortTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PortTemplate
+        fields = ["id", "device_type", "name", "port_type", "position"]
+        read_only_fields = ["id"]
+
+
+class DevicePortSerializer(serializers.ModelSerializer):
+    cable = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DevicePort
+        fields = ["id", "host", "patch_panel", "name", "port_type", "position", "description", "cable"]
+        read_only_fields = ["id"]
+
+    def get_cable(self, obj):
+        cable = getattr(obj, "cable_as_a", None) or getattr(obj, "cable_as_b", None)
+        if cable:
+            return {"id": cable.id, "cable_type": cable.cable_type, "label": cable.label}
+        return None
+
+    def validate(self, attrs):
+        host = attrs.get("host")
+        patch_panel = attrs.get("patch_panel")
+        if bool(host) == bool(patch_panel):
+            raise serializers.ValidationError("Port must belong to exactly one of host or patch_panel.")
+        return attrs
+
+
+class PatchPanelSerializer(serializers.ModelSerializer):
+    port_count_current = serializers.IntegerField(source="ports.count", read_only=True)
+
+    class Meta:
+        model = PatchPanel
+        fields = ["id", "site", "name", "port_count", "description", "port_count_current", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class CableSerializer(serializers.ModelSerializer):
+    port_a_display = serializers.CharField(source="port_a.__str__", read_only=True)
+    port_b_display = serializers.CharField(source="port_b.__str__", read_only=True)
+
+    class Meta:
+        model = Cable
+        fields = ["id", "port_a", "port_b", "cable_type", "label", "port_a_display", "port_b_display", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        port_a = attrs.get("port_a") or (self.instance and self.instance.port_a)
+        port_b = attrs.get("port_b") or (self.instance and self.instance.port_b)
+        if port_a and port_b and port_a.id == port_b.id:
+            raise serializers.ValidationError("Cannot connect a port to itself.")
+        return attrs
