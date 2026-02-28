@@ -85,7 +85,7 @@ export function Sidebar({ className, style }: SidebarProps) {
   }
 
   return (
-    <aside className={cn('border-r border-border bg-card overflow-y-auto overflow-x-hidden shrink-0', className)} style={style}>
+    <aside className={cn('border-r border-border bg-card overflow-y-auto overflow-x-hidden shrink-0 h-full', className)} style={style}>
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
           <button
