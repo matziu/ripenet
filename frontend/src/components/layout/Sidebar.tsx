@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { projectsApi, sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi } from '@/api/endpoints'
+import { projectsApi, sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi, patchPanelsApi } from '@/api/endpoints'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
 import { cn, copyToClipboard } from '@/lib/utils'
@@ -16,12 +16,12 @@ import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { ProjectForm } from '@/components/data/forms/ProjectForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { toast } from 'sonner'
-import type { Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool } from '@/types'
+import type { Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool, PatchPanel } from '@/types'
 import {
   FolderOpen, MapPin, Network, Server, Monitor,
   ChevronRight, ChevronDown, Plus,
   Pencil, Trash2, Cable, Layers,
-  ChevronsUpDown, ChevronsDownUp,
+  ChevronsUpDown, ChevronsDownUp, LayoutGrid,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -306,7 +306,15 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
     enabled: expanded,
   })
 
+  const { data: patchPanelsData } = useQuery({
+    queryKey: ['patch-panels', { site: String(site.id) }],
+    queryFn: () => patchPanelsApi.list({ site: String(site.id) }),
+    select: (res) => res.data.results,
+    enabled: expanded,
+  })
+
   const vlans = vlansData ?? []
+  const patchPanels = patchPanelsData ?? []
 
   const handleClick = () => {
     setSelectedSite(site.id)
@@ -367,6 +375,15 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
           </div>
           {standaloneSubnets?.map((subnet) => (
             <SubnetTreeItem key={subnet.id} subnet={subnet} />
+          ))}
+          {/* Patch Panels section */}
+          <div className="group flex items-center px-1.5 pt-1">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              Patch Panels{patchPanels.length > 0 && ` (${patchPanels.length})`}
+            </span>
+          </div>
+          {patchPanels.map((pp) => (
+            <PatchPanelTreeItem key={pp.id} patchPanel={pp} />
           ))}
         </div>
       )}
@@ -655,6 +672,41 @@ function TunnelTreeItem({ tunnel, projectId }: { tunnel: Tunnel; projectId: numb
       <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Tunnel">
         <TunnelForm projectId={projectId} tunnel={tunnel} onClose={() => setEditOpen(false)} />
       </Dialog>
+    </div>
+  )
+}
+
+// ── PatchPanel ───────────────────────────────────────────────
+
+function PatchPanelTreeItem({ patchPanel }: { patchPanel: PatchPanel }) {
+  const selectedPatchPanelId = useSelectionStore((s) => s.selectedPatchPanelId)
+  const setSelectedPatchPanel = useSelectionStore((s) => s.setSelectedPatchPanel)
+  const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
+  const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const closeMobile = useCloseSidebarOnMobile()
+  const isSelected = selectedPatchPanelId === patchPanel.id
+
+  const handleClick = () => {
+    setSelectedPatchPanel(patchPanel.id)
+    if (!detailPanelOpen) toggleDetailPanel()
+    closeMobile()
+  }
+
+  return (
+    <div className="group flex items-center">
+      <button
+        onClick={handleClick}
+        className={cn(
+          'flex flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors min-w-0',
+          isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
+        )}
+      >
+        <LayoutGrid className="h-3 w-3 shrink-0" />
+        <span className="truncate">{patchPanel.name}</span>
+        <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
+          {patchPanel.port_count}p
+        </span>
+      </button>
     </div>
   )
 }
