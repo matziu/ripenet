@@ -20,7 +20,7 @@ class DevicePort(models.Model):
         ordering = ["position", "name"]
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(host__isnull=False, patch_panel__isnull=True)
                     | models.Q(host__isnull=True, patch_panel__isnull=False)
                 ),
