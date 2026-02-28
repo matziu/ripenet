@@ -65,23 +65,27 @@
   color-scheme: dark;
 }
 
+.dark,
+.dark * {
+  scrollbar-color: #4b5563 #1f2937;
+  scrollbar-width: thin;
+}
+
+.dark::-webkit-scrollbar,
 .dark *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
+.dark::-webkit-scrollbar-track,
 .dark *::-webkit-scrollbar-track {
   background: #1f2937;
 }
+.dark::-webkit-scrollbar-thumb,
 .dark *::-webkit-scrollbar-thumb {
   background: #4b5563;
   border-radius: 4px;
 }
+.dark::-webkit-scrollbar-thumb:hover,
 .dark *::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
-}
-
-@supports not selector(::-webkit-scrollbar) {
-  .dark * {
-    scrollbar-color: #4b5563 #1f2937;
-  }
 }

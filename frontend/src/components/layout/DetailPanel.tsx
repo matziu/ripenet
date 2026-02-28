@@ -55,7 +55,7 @@ export function DetailPanel({ className }: { className?: string }) {
   const effectiveVlanId = selectedVlanId || topoVlanId
 
   return (
-    <aside className={cn("w-80 border-l border-border bg-card overflow-y-auto", className)}>
+    <aside className={cn("w-80 h-full border-l border-border bg-card overflow-y-auto", className)}>
       <div className="flex items-center justify-between p-3 border-b border-border">
         <h3 className="text-sm font-semibold">Details</h3>
         <button onClick={toggleDetailPanel} className="p-1 rounded hover:bg-accent">
