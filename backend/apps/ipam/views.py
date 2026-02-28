@@ -356,6 +356,8 @@ class PhysicalTopologyView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, site_pk):
+        from apps.projects.models import Site
+        get_object_or_404(Site, pk=site_pk)
         hosts = Host.objects.filter(
             subnet__site_id=site_pk
         ).select_related("subnet", "subnet__site").prefetch_related(
