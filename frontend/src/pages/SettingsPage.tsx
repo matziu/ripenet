@@ -63,8 +63,18 @@ export function SettingsPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Data Backup</h2>
         <p className="text-xs text-muted-foreground">
-          Download all application data (projects, sites, VLANs, subnets, hosts, tunnels, DHCP pools, users, audit log) as a JSON file.
+          Download a full JSON snapshot of the database. The backup includes:
         </p>
+        <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-0.5">
+          <li>Projects with settings and supernets</li>
+          <li>Sites (names, addresses, coordinates)</li>
+          <li>VLANs, subnets, gateways, descriptions</li>
+          <li>Hosts (IP, hostname, MAC, device type, notes)</li>
+          <li>DHCP pools (ranges, lease time, DNS/gateway)</li>
+          <li>Tunnels (type, endpoints, subnet)</li>
+          <li>User accounts (usernames, roles, emails)</li>
+          <li>Audit log (all recorded changes)</li>
+        </ul>
         <button
           onClick={() => downloadMutation.mutate()}
           disabled={downloadMutation.isPending}

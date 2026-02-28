@@ -19,6 +19,10 @@ apiClient.interceptors.request.use((config) => {
   if (token && config.method !== 'get') {
     config.headers['X-CSRFToken'] = token
   }
+  // Let browser set Content-Type for FormData (multipart/form-data with boundary)
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  }
   return config
 })
 
