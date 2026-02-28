@@ -18,7 +18,7 @@ import { PatchPanelForm } from '@/components/data/forms/PatchPanelForm'
 import { CableForm } from '@/components/data/forms/CableForm'
 import { PortForm } from '@/components/data/forms/PortForm'
 import { toast } from 'sonner'
-import type { Host, DevicePort, PatchPanel as PatchPanelType, Cable as CableType } from '@/types'
+import type { Host } from '@/types'
 import { useDeviceTypeLabel } from '@/hooks/useDeviceTypeLabel'
 import {
   X, Pencil, Trash2, Plus,
