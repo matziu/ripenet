@@ -66,7 +66,7 @@ function App() {
           <Route path="/projects/:projectId/*" element={<ProjectPage />} />
           <Route path="/wizard" element={<WizardPage />} />
           <Route path="/users" element={<UsersPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/*" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
