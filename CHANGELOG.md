@@ -4,8 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.1] - 2026-02-28
 
+### Added
+- Data backup & restore in Settings page (JSON export/import, admin only)
+- Detailed backup contents description in Settings UI
+- User management panel (CRUD for admin users)
+
 ### Fixed
 - Sidebar not scrolling when content exceeds screen height
+- Backup import returning 415 error (Content-Type fix for FormData uploads)
 - Backend port (8000) no longer exposed to host — communicates via internal Docker network only
 
 ### Changed
