@@ -69,13 +69,13 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   setSelectedPatchPanel: (id) => set({
     selectedPatchPanelId: id,
     selectedCableId: null, selectedPortId: null,
-    selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null,
+    selectedVlanId: null, selectedSubnetId: null,
     selectedHostId: null, selectedTunnelId: null, selectedDhcpPoolId: null,
   }),
   setSelectedCable: (id) => set({
     selectedCableId: id,
     selectedPatchPanelId: null, selectedPortId: null,
-    selectedSiteId: null, selectedVlanId: null, selectedSubnetId: null,
+    selectedVlanId: null, selectedSubnetId: null,
     selectedHostId: null, selectedTunnelId: null, selectedDhcpPoolId: null,
   }),
   setSelectedPort: (id) => set({ selectedPortId: id }),

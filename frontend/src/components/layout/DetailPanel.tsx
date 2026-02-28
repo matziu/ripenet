@@ -5,7 +5,7 @@ import { useTopologyStore } from '@/stores/topology.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi, portsApi, patchPanelsApi, cablesApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
-import { cn } from '@/lib/utils'
+import { cn, extractApiError } from '@/lib/utils'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { Dialog } from '@/components/ui/Dialog'
 import { SiteForm } from '@/components/data/forms/SiteForm'
@@ -14,6 +14,9 @@ import { SubnetForm } from '@/components/data/forms/SubnetForm'
 import { HostForm } from '@/components/data/forms/HostForm'
 import { DHCPPoolForm } from '@/components/data/forms/DHCPPoolForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
+import { PatchPanelForm } from '@/components/data/forms/PatchPanelForm'
+import { CableForm } from '@/components/data/forms/CableForm'
+import { PortForm } from '@/components/data/forms/PortForm'
 import { toast } from 'sonner'
 import type { Host, DevicePort, PatchPanel as PatchPanelType, Cable as CableType } from '@/types'
 import { useDeviceTypeLabel } from '@/hooks/useDeviceTypeLabel'
@@ -616,35 +619,92 @@ function DHCPPoolDetail({ poolId }: { poolId: number }) {
 // ── Host Ports Section ───────────────────────────────────────
 
 function HostPortsSection({ hostId }: { hostId: number }) {
+  const queryClient = useQueryClient()
+  const [addPortOpen, setAddPortOpen] = useState(false)
+  const [editPortId, setEditPortId] = useState<number | null>(null)
+
   const { data: ports } = useQuery({
     queryKey: ['ports', { host: hostId }],
     queryFn: () => portsApi.list({ host: String(hostId) }),
     select: (res) => res.data,
   })
 
-  if (!ports || ports.length === 0) return null
+  const deletePortMutation = useMutation({
+    mutationFn: (portId: number) => portsApi.delete(portId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ports'] })
+      queryClient.invalidateQueries({ queryKey: ['physical-topology'] })
+      toast.success('Port deleted')
+    },
+    onError: (err: unknown) => {
+      toast.error(extractApiError(err, 'Failed to delete port'))
+    },
+  })
+
+  const editingPort = editPortId ? ports?.find((p) => p.id === editPortId) : undefined
 
   return (
     <div>
-      <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-        Ports ({ports.length})
-      </h4>
-      <div className="space-y-1">
-        {ports.map((port) => (
-          <div
-            key={port.id}
-            className="flex items-center justify-between rounded-md border border-border p-2 text-xs"
-          >
-            <div>
-              <span className="font-mono">{port.name}</span>
-              <span className="text-muted-foreground ml-2">{port.port_type}</span>
-            </div>
-            <span className={port.cable ? 'text-emerald-500' : 'text-muted-foreground'}>
-              {port.cable ? port.cable.label || port.cable.cable_type : 'Free'}
-            </span>
-          </div>
-        ))}
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+          Ports ({ports?.length ?? 0})
+        </h4>
+        <button
+          onClick={() => setAddPortOpen(true)}
+          className="text-xs text-primary hover:underline flex items-center gap-1"
+        >
+          <Plus className="h-3 w-3" /> Port
+        </button>
       </div>
+      {ports && ports.length > 0 && (
+        <div className="space-y-1">
+          {ports.map((port) => (
+            <div
+              key={port.id}
+              className="flex items-center justify-between rounded-md border border-border p-2 text-xs group"
+            >
+              <div>
+                <span className="font-mono">{port.name}</span>
+                <span className="text-muted-foreground ml-2">{port.port_type}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className={port.cable ? 'text-emerald-500' : 'text-muted-foreground'}>
+                  {port.cable ? port.cable.label || port.cable.cable_type : 'Free'}
+                </span>
+                <button
+                  onClick={() => setEditPortId(port.id)}
+                  className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Edit port"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Delete port "${port.name}"?`)) deletePortMutation.mutate(port.id)
+                  }}
+                  className="p-0.5 rounded hover:bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete port"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {(!ports || ports.length === 0) && (
+        <p className="text-xs text-muted-foreground">No ports</p>
+      )}
+
+      <Dialog open={addPortOpen} onOpenChange={setAddPortOpen} title="Add Port">
+        <PortForm hostId={hostId} onClose={() => setAddPortOpen(false)} />
+      </Dialog>
+
+      <Dialog open={!!editPortId} onOpenChange={(open) => { if (!open) setEditPortId(null) }} title="Edit Port">
+        {editingPort && (
+          <PortForm port={editingPort} onClose={() => setEditPortId(null)} />
+        )}
+      </Dialog>
     </div>
   )
 }
@@ -654,6 +714,8 @@ function HostPortsSection({ hostId }: { hostId: number }) {
 function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
   const queryClient = useQueryClient()
   const [editOpen, setEditOpen] = useState(false)
+  const [addPortOpen, setAddPortOpen] = useState(false)
+  const [editPortId, setEditPortId] = useState<number | null>(null)
 
   const { data: pp } = useQuery({
     queryKey: ['patch-panel', patchPanelId],
@@ -671,6 +733,7 @@ function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
     mutationFn: () => patchPanelsApi.delete(patchPanelId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patch-panels'] })
+      queryClient.invalidateQueries({ queryKey: ['physical-topology'] })
       useSelectionStore.getState().setSelectedPatchPanel(null)
       toast.success('Patch panel deleted')
     },
@@ -679,6 +742,21 @@ function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
       toast.error(message)
     },
   })
+
+  const deletePortMutation = useMutation({
+    mutationFn: (portId: number) => portsApi.delete(portId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ports'] })
+      queryClient.invalidateQueries({ queryKey: ['physical-topology'] })
+      queryClient.invalidateQueries({ queryKey: ['patch-panels'] })
+      toast.success('Port deleted')
+    },
+    onError: (err: unknown) => {
+      toast.error(extractApiError(err, 'Failed to delete port'))
+    },
+  })
+
+  const editingPort = editPortId ? ports?.find((p) => p.id === editPortId) : undefined
 
   if (!pp) return <DetailLoading />
 
@@ -694,36 +772,79 @@ function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
         {pp.description && <DetailRow label="Description" value={pp.description} />}
       </dl>
 
-      {ports && ports.length > 0 && (
-        <div>
-          <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-            Ports ({ports.length})
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+            Ports ({ports?.length ?? 0})
           </h4>
+          <button
+            onClick={() => setAddPortOpen(true)}
+            className="text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            <Plus className="h-3 w-3" /> Port
+          </button>
+        </div>
+        {ports && ports.length > 0 && (
           <div className="space-y-1">
             {ports.map((port) => (
               <div
                 key={port.id}
-                className="flex items-center justify-between rounded-md border border-border p-2 text-xs"
+                className="flex items-center justify-between rounded-md border border-border p-2 text-xs group"
               >
                 <div>
                   <span className="font-mono">{port.name}</span>
                   <span className="text-muted-foreground ml-2">{port.port_type}</span>
                 </div>
-                <span className={port.cable ? 'text-emerald-500' : 'text-muted-foreground'}>
-                  {port.cable ? port.cable.label || port.cable.cable_type : 'Free'}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className={port.cable ? 'text-emerald-500' : 'text-muted-foreground'}>
+                    {port.cable ? port.cable.label || port.cable.cable_type : 'Free'}
+                  </span>
+                  <button
+                    onClick={() => setEditPortId(port.id)}
+                    className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Edit port"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Delete port "${port.name}"?`)) deletePortMutation.mutate(port.id)
+                    }}
+                    className="p-0.5 rounded hover:bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete port"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+        {(!ports || ports.length === 0) && (
+          <p className="text-xs text-muted-foreground">No ports</p>
+        )}
+      </div>
 
       <DetailActions
-        onEdit={() => setEditOpen(false)}
+        onEdit={() => setEditOpen(true)}
         onDelete={() => {
           if (window.confirm(`Delete patch panel "${pp.name}"?`)) deleteMutation.mutate()
         }}
       />
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Patch Panel">
+        <PatchPanelForm siteId={pp.site} patchPanel={pp} onClose={() => setEditOpen(false)} />
+      </Dialog>
+
+      <Dialog open={addPortOpen} onOpenChange={setAddPortOpen} title="Add Port">
+        <PortForm patchPanelId={patchPanelId} onClose={() => setAddPortOpen(false)} />
+      </Dialog>
+
+      <Dialog open={!!editPortId} onOpenChange={(open) => { if (!open) setEditPortId(null) }} title="Edit Port">
+        {editingPort && (
+          <PortForm port={editingPort} onClose={() => setEditPortId(null)} />
+        )}
+      </Dialog>
     </div>
   )
 }
@@ -732,6 +853,8 @@ function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
 
 function CableDetail({ cableId }: { cableId: number }) {
   const queryClient = useQueryClient()
+  const [editOpen, setEditOpen] = useState(false)
+  const siteId = useSelectionStore((s) => s.selectedSiteId)
 
   const { data: cable } = useQuery({
     queryKey: ['cable', cableId],
@@ -743,6 +866,8 @@ function CableDetail({ cableId }: { cableId: number }) {
     mutationFn: () => cablesApi.delete(cableId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cables'] })
+      queryClient.invalidateQueries({ queryKey: ['physical-topology'] })
+      queryClient.invalidateQueries({ queryKey: ['ports'] })
       useSelectionStore.getState().setSelectedCable(null)
       toast.success('Cable deleted')
     },
@@ -764,16 +889,18 @@ function CableDetail({ cableId }: { cableId: number }) {
         <DetailRow label="Port B" value={cable.port_b_display} />
       </dl>
 
-      <div className="flex gap-2 pt-1 border-t border-border">
-        <button
-          onClick={() => {
-            if (window.confirm('Delete this cable?')) deleteMutation.mutate()
-          }}
-          className="flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs text-red-500 hover:bg-red-500/10 transition-colors"
-        >
-          <Trash2 className="h-3 w-3" /> Delete
-        </button>
-      </div>
+      <DetailActions
+        onEdit={() => setEditOpen(true)}
+        onDelete={() => {
+          if (window.confirm('Delete this cable?')) deleteMutation.mutate()
+        }}
+      />
+
+      {siteId && (
+        <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Cable">
+          <CableForm siteId={siteId} cable={cable} onClose={() => setEditOpen(false)} />
+        </Dialog>
+      )}
     </div>
   )
 }
