@@ -16,6 +16,7 @@ import { DHCPPoolForm } from '@/components/data/forms/DHCPPoolForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
 import { toast } from 'sonner'
 import type { Host } from '@/types'
+import { useDeviceTypeLabel } from '@/hooks/useDeviceTypeLabel'
 import {
   X, Pencil, Trash2, Plus,
   MapPin, Network, Server, Monitor, Cable, Layers,
@@ -427,6 +428,7 @@ function TunnelDetail({ tunnelId, projectId }: { tunnelId: number; projectId: nu
 function HostDetail({ hostId }: { hostId: number }) {
   const queryClient = useQueryClient()
   const [editOpen, setEditOpen] = useState(false)
+  const getLabel = useDeviceTypeLabel()
 
   const { data: host } = useQuery({
     queryKey: ['host', hostId],
@@ -460,7 +462,7 @@ function HostDetail({ hostId }: { hostId: number }) {
 
       <dl className="space-y-1.5 text-xs">
         {host.mac_address && <DetailRow label="MAC" value={host.mac_address} mono />}
-        <DetailRow label="Device Type" value={host.device_type} />
+        <DetailRow label="Device Type" value={getLabel(host.device_type)} />
         {host.description && <DetailRow label="Description" value={host.description} />}
       </dl>
 
@@ -633,6 +635,7 @@ function DetailActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () 
 
 function HostList({ hosts }: { hosts: Host[] }) {
   const setSelectedHost = useSelectionStore((s) => s.setSelectedHost)
+  const getLabel = useDeviceTypeLabel()
 
   return (
     <div className="space-y-1">
@@ -648,7 +651,7 @@ function HostList({ hosts }: { hosts: Host[] }) {
               <p className="text-muted-foreground truncate mt-0.5">{host.hostname}</p>
             )}
           </div>
-          <span className="text-[10px] text-muted-foreground">{host.device_type}</span>
+          <span className="text-[10px] text-muted-foreground">{getLabel(host.device_type)}</span>
         </div>
       ))}
       {hosts.length === 0 && (

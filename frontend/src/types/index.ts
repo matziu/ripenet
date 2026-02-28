@@ -80,7 +80,12 @@ export interface Subnet {
   updated_at: string
 }
 
-export type DeviceType = 'server' | 'router' | 'switch' | 'firewall' | 'ap' | 'nas' | 'camera' | 'printer' | 'phone' | 'workstation' | 'other'
+export interface DeviceTypeOption {
+  id: number
+  value: string
+  label: string
+  position: number
+}
 
 export interface Host {
   id: number
@@ -88,7 +93,7 @@ export interface Host {
   ip_address: string
   hostname: string
   mac_address: string
-  device_type: DeviceType
+  device_type: string
   ip_type: 'static' | 'dhcp_lease'
   dhcp_pool: number | null
   description: string
@@ -135,7 +140,7 @@ export interface HostTopology {
   id: number
   ip_address: string
   hostname: string
-  device_type: DeviceType
+  device_type: string
   ip_type: 'static' | 'dhcp_lease'
   dhcp_pool: number | null
 }

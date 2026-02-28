@@ -7,10 +7,15 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from rest_framework.permissions import IsAuthenticated
+
 from .filters import HostFilter, SubnetFilter, TunnelFilter, VLANFilter, DHCPPoolFilter
-from .models import VLAN, Host, Subnet, Tunnel, DHCPPool
-from .permissions import ProjectPermission
-from .serializers import HostSerializer, SubnetSerializer, TunnelSerializer, VLANSerializer, DHCPPoolSerializer
+from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType
+from .permissions import IsAdmin, ProjectPermission
+from .serializers import (
+    HostSerializer, SubnetSerializer, TunnelSerializer, VLANSerializer,
+    DHCPPoolSerializer, DeviceTypeSerializer,
+)
 
 
 class VLANViewSet(viewsets.ModelViewSet):
@@ -24,6 +29,27 @@ class VLANViewSet(viewsets.ModelViewSet):
             subnet_count=Count("subnets", distinct=True),
             host_count=Count("subnets__hosts", distinct=True),
         ).select_related("site", "site__project")
+
+
+class DeviceTypeViewSet(viewsets.ModelViewSet):
+    serializer_class = DeviceTypeSerializer
+    queryset = DeviceType.objects.all()
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdmin()]
+
+    def destroy(self, request, *args, **kwargs):
+        device_type = self.get_object()
+        host_count = Host.objects.filter(device_type=device_type.value).count()
+        if host_count > 0:
+            return Response(
+                {"detail": f"Cannot delete: {host_count} host(s) use this device type."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class SubnetViewSet(viewsets.ModelViewSet):

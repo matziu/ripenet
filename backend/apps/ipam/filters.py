@@ -44,7 +44,7 @@ class HostFilter(django_filters.FilterSet):
     vlan = django_filters.NumberFilter(field_name="subnet__vlan_id")
     subnet = django_filters.NumberFilter(field_name="subnet_id")
     dhcp_pool = django_filters.NumberFilter(field_name="dhcp_pool_id")
-    device_type = django_filters.ChoiceFilter(choices=Host.DeviceType.choices)
+    device_type = django_filters.CharFilter()
 
     class Meta:
         model = Host

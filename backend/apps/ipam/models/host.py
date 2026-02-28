@@ -5,24 +5,11 @@ from .subnet import Subnet
 
 
 class Host(models.Model):
-    class DeviceType(models.TextChoices):
-        SERVER = "server", "Server"
-        ROUTER = "router", "Router"
-        SWITCH = "switch", "Switch"
-        FIREWALL = "firewall", "Firewall"
-        AP = "ap", "Access Point"
-        NAS = "nas", "NAS"
-        CAMERA = "camera", "Camera"
-        PRINTER = "printer", "Printer"
-        PHONE = "phone", "Phone"
-        WORKSTATION = "workstation", "Workstation"
-        OTHER = "other", "Other"
-
     subnet = models.ForeignKey(Subnet, on_delete=models.CASCADE, related_name="hosts")
     ip_address = InetAddressField(help_text="Host IP address")
     hostname = models.CharField(max_length=255, blank=True)
     mac_address = models.CharField(max_length=17, blank=True, help_text="MAC address (XX:XX:XX:XX:XX:XX)")
-    device_type = models.CharField(max_length=20, choices=DeviceType.choices, default=DeviceType.OTHER)
+    device_type = models.CharField(max_length=50, default="other")
 
     class IPType(models.TextChoices):
         STATIC = "static", "Static IP"

@@ -9,6 +9,7 @@ router.register(r"subnets", views.SubnetViewSet, basename="subnet")
 router.register(r"hosts", views.HostViewSet, basename="host")
 router.register(r"tunnels", views.TunnelViewSet, basename="tunnel")
 router.register(r"dhcp-pools", views.DHCPPoolViewSet, basename="dhcppool")
+router.register(r"device-types", views.DeviceTypeViewSet, basename="devicetype")
 
 urlpatterns = [
     path("", include(router.urls)),

@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-02-28
+
+### Added
+- Configurable device types — managed from Settings page instead of hardcoded list
+- Device Types CRUD API (`/api/v1/device-types/`) with admin-only write access
+- Device type labels displayed throughout the UI (detail panel, table view, host form)
+- Dark mode scrollbar styling for sidebar and all panels
+
+### Changed
+- Host `device_type` field is now a free CharField validated against the DeviceType table
+- Host form dropdown dynamically loads device types from the database
+- Device type filter changed from ChoiceFilter to CharFilter
+
+### Migration notes
+- Run `docker compose up --build` — migration `0008` creates the `DeviceType` table and seeds 11 default types
+- Existing hosts are unaffected (their `device_type` values match the seeded defaults)
+
+---
+
 ## [1.0.1] - 2026-02-28
 
 ### Added
@@ -46,23 +65,24 @@ Initial release.
 
 ## Upgrading
 
+### From 1.0.x to 1.1.0
+
+```bash
+docker compose down
+git pull origin main
+docker compose up --build
+```
+
+Database migration runs automatically on startup — creates the `DeviceType` table and seeds default types.
+
 ### From 1.0.0 to 1.0.1
 
-1. Stop the app:
-   ```bash
-   docker compose down
-   ```
+```bash
+docker compose down
+git pull origin main
+docker compose up --build
+```
 
-2. Pull latest changes:
-   ```bash
-   git pull origin main
-   ```
+No database migrations required.
 
-3. Start the app (rebuild to apply changes):
-   ```bash
-   docker compose up --build
-   ```
-
-No database migrations required. No configuration changes needed.
-
-> **Note:** If you previously used `docker compose -f docker-compose.dev.yml`, switch to just `docker compose` — the dev file has been removed and everything is now in `docker-compose.yml`.
+> **Note:** If you previously used `docker compose -f docker-compose.dev.yml`, switch to just `docker compose` — the dev file has been removed.

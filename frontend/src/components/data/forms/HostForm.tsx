@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { hostsApi, subnetsApi, dhcpPoolsApi } from '@/api/endpoints'
+import { hostsApi, subnetsApi, dhcpPoolsApi, deviceTypesApi } from '@/api/endpoints'
 import { extractApiError } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { Host } from '@/types'
@@ -29,6 +29,13 @@ interface FormValues {
 export function HostForm({ subnetId, projectId, host, defaultIpType, defaultDhcpPoolId, onClose }: HostFormProps) {
   const queryClient = useQueryClient()
   const needsSubnetSelector = !subnetId && !host
+
+  const { data: deviceTypes } = useQuery({
+    queryKey: ['device-types'],
+    queryFn: () => deviceTypesApi.list(),
+    select: (res) => res.data,
+    staleTime: 5 * 60 * 1000,
+  })
 
   const { data: subnets } = useQuery({
     queryKey: ['subnets', { project: projectId }],
@@ -169,17 +176,9 @@ export function HostForm({ subnetId, projectId, host, defaultIpType, defaultDhcp
           {...register('device_type')}
           className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
         >
-          <option value="server">Server</option>
-          <option value="router">Router</option>
-          <option value="switch">Switch</option>
-          <option value="firewall">Firewall</option>
-          <option value="ap">Access Point</option>
-          <option value="nas">NAS</option>
-          <option value="camera">Camera</option>
-          <option value="printer">Printer</option>
-          <option value="phone">Phone</option>
-          <option value="workstation">Workstation</option>
-          <option value="other">Other</option>
+          {deviceTypes?.map((dt) => (
+            <option key={dt.value} value={dt.value}>{dt.label}</option>
+          ))}
         </select>
       </div>
 

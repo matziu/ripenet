@@ -1,5 +1,5 @@
 import type {
-  Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool,
+  Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool, DeviceTypeOption,
   ProjectTopology, SearchResult, PaginatedResponse, AuditLog, User, UserAdmin,
 } from '@/types'
 import apiClient from './client'
@@ -72,6 +72,18 @@ export const subnetsApi = {
     apiClient.get<{ next_free_ip: string }>(`/subnets/${id}/next-free-ip/`, poolId ? { params: { pool: poolId } } : undefined),
   suggestedPoolRange: (id: number) =>
     apiClient.get<{ start_ip: string; end_ip: string; size: number }>(`/subnets/${id}/suggested-pool-range/`),
+}
+
+// Device Types
+export const deviceTypesApi = {
+  list: () =>
+    apiClient.get<DeviceTypeOption[]>('/device-types/'),
+  create: (data: Partial<DeviceTypeOption>) =>
+    apiClient.post<DeviceTypeOption>('/device-types/', data),
+  update: (id: number, data: Partial<DeviceTypeOption>) =>
+    apiClient.patch<DeviceTypeOption>(`/device-types/${id}/`, data),
+  delete: (id: number) =>
+    apiClient.delete(`/device-types/${id}/`),
 }
 
 // Hosts

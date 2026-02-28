@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import VLAN, Host, Subnet, Tunnel
+from .models import VLAN, Host, Subnet, Tunnel, DeviceType
 
 
 class SubnetInline(admin.TabularInline):
@@ -34,6 +34,12 @@ class HostAdmin(admin.ModelAdmin):
     list_display = ("ip_address", "hostname", "device_type", "subnet")
     list_filter = ("device_type", "subnet__project")
     search_fields = ("hostname", "description")
+
+
+@admin.register(DeviceType)
+class DeviceTypeAdmin(admin.ModelAdmin):
+    list_display = ("value", "label", "position")
+    ordering = ("position",)
 
 
 @admin.register(Tunnel)

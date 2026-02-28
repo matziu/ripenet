@@ -1,12 +1,30 @@
+import re
+
 from rest_framework import serializers
 
 from apps.projects.models import Project, Site
 from apps.projects.serializers import SiteWanAddressSerializer
-from .models import VLAN, Host, Subnet, Tunnel, DHCPPool
+from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType
 from .validators import (
     check_ip_duplicate_in_project, check_ip_in_subnet, check_subnet_overlap,
     check_pool_range_in_subnet, check_pool_overlap, check_static_ip_not_in_pool, check_lease_ip_in_pool,
 )
+
+
+class DeviceTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeviceType
+        fields = ["id", "value", "label", "position"]
+        read_only_fields = ["id"]
+
+    def validate_value(self, value):
+        if not re.match(r'^[a-z0-9_]+$', value):
+            raise serializers.ValidationError("Only lowercase letters, digits and underscores are allowed.")
+        return value
+
+    def update(self, instance, validated_data):
+        validated_data.pop("value", None)
+        return super().update(instance, validated_data)
 
 
 class HostSerializer(serializers.ModelSerializer):
@@ -20,6 +38,10 @@ class HostSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
+        device_type = attrs.get("device_type") or (self.instance and self.instance.device_type)
+        if device_type and not DeviceType.objects.filter(value=device_type).exists():
+            raise serializers.ValidationError({"device_type": f"Unknown device type: {device_type}"})
+
         subnet = attrs.get("subnet") or (self.instance and self.instance.subnet)
         ip_address = attrs.get("ip_address") or (self.instance and self.instance.ip_address)
         ip_type = attrs.get("ip_type") or (self.instance and self.instance.ip_type) or "static"

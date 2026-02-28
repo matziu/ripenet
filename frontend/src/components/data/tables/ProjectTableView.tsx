@@ -17,6 +17,7 @@ import {
   Building2, Network, Server, ChevronDown, ChevronRight, MapPin, Wand2,
 } from 'lucide-react'
 import type { Site, VLAN, Subnet, Host, Tunnel, DHCPPool } from '@/types'
+import { useDeviceTypeLabel } from '@/hooks/useDeviceTypeLabel'
 
 // ─── Tree node types ──────────────────────────────────────────
 
@@ -560,6 +561,7 @@ function SubnetRow({
   deleteDhcpPool: { mutate: (id: number) => void }
   indent: 'vlan' | 'site'
 }) {
+  const getLabel = useDeviceTypeLabel()
   const subKey = `subnet-${subnetNode.subnet.id}`
   const subOpen = expanded.has(subKey)
   const pl = indent === 'vlan' ? 'pl-10 md:pl-14' : 'pl-6 md:pl-8'
@@ -624,11 +626,11 @@ function SubnetRow({
             </span>
           </td>
           <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
-            {host.device_type}
+            {getLabel(host.device_type)}
             {host.mac_address && ` · ${host.mac_address}`}
           </td>
           <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden md:table-cell">
-            {host.device_type}
+            {getLabel(host.device_type)}
           </td>
           <td className="px-2 md:px-3 py-1.5">
             <div className="flex justify-end gap-0.5">
@@ -693,7 +695,7 @@ function SubnetRow({
                   </span>
                 </td>
                 <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">
-                  {host.device_type}
+                  {getLabel(host.device_type)}
                   {host.mac_address && ` · ${host.mac_address}`}
                 </td>
                 <td className="px-2 md:px-3 py-1.5 text-xs text-muted-foreground hidden md:table-cell">
