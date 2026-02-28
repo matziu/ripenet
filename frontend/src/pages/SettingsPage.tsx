@@ -66,7 +66,7 @@ function GeneralSection() {
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Version</span>
-          <span className="font-mono">1.0.0</span>
+          <span className="font-mono">1.2.0</span>
         </div>
       </div>
     </div>

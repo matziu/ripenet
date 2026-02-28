@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-02-28
+
+### Added
+- Physical Topology (L1) — device ports, patch panels, cables, and per-site React Flow visualization
+- Port templates on device types — auto-create ports when hosts are created
+- "Apply to existing hosts" action to retroactively add missing ports from templates
+- Patch panels with auto-generated ports
+- Cables connecting any two device ports with type-based color coding
+- Physical View (`4` key) — React Flow canvas showing hosts, patch panels, and cables per site
+- Cable form with cascading device → free port dropdowns
+- Patch panel and port CRUD forms
+- Patch panels listed under Site in sidebar tree
+- Port details section in host detail panel
+- Cable and patch panel detail views in detail panel
+
+### Changed
+- Settings page refactored to sidebar navigation with sub-routes (General, Device Types, Users, Backup)
+- Port templates management integrated into Device Types settings
+- Fixed keyboard shortcut labels (1=Topo, 2=Geo, 3=Table) to match actual navigation targets
+- Version number updated to 1.2.0
+
+### Migration notes
+- Run `docker compose up --build` — migration `0009` creates PortTemplate, DevicePort, PatchPanel, and Cable tables
+
+---
+
 ## [1.1.1] - 2026-02-28
 
 ### Added
@@ -75,6 +101,16 @@ Initial release.
 - Docker Compose one-command deployment
 
 ## Upgrading
+
+### From 1.1.x to 1.2.0
+
+```bash
+docker compose down
+git pull origin main
+docker compose up --build
+```
+
+Database migration runs automatically on startup — creates PortTemplate, DevicePort, PatchPanel, and Cable tables.
 
 ### From 1.0.x to 1.1.0
 
