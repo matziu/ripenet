@@ -2,6 +2,7 @@ import ipaddress
 
 from django.db.models import Count, Q
 from django.db.models.expressions import RawSQL
+from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -279,7 +280,7 @@ class PortTemplateViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def apply(self, request, device_type_pk=None):
         """Sync port templates to all existing hosts of this device type."""
-        dt = DeviceType.objects.get(pk=device_type_pk)
+        dt = get_object_or_404(DeviceType, pk=device_type_pk)
         templates = dt.port_templates.all()
         hosts = Host.objects.filter(device_type=dt.value)
         created = 0
