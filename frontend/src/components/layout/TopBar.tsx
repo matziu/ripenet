@@ -5,7 +5,7 @@ import { authApi } from '@/api/endpoints'
 import { cn } from '@/lib/utils'
 import {
   Search, Moon, Sun, PanelLeftClose, PanelLeft,
-  Network, Map, Table, Settings,
+  Network, Map, Table, Settings, Cable,
 } from 'lucide-react'
 
 export function TopBar() {
@@ -27,19 +27,22 @@ export function TopBar() {
   const pathAfterProject = projectId
     ? location.pathname.split(`/projects/${projectId}/`)[1] ?? ''
     : ''
-  const activeView = pathAfterProject.startsWith('geo')
-    ? 'geo'
-    : pathAfterProject.startsWith('table')
-      ? 'table'
-      : 'topology'
+  const activeView = pathAfterProject.startsWith('physical')
+    ? 'physical'
+    : pathAfterProject.startsWith('geo')
+      ? 'geo'
+      : pathAfterProject.startsWith('table')
+        ? 'table'
+        : 'topology'
 
-  const viewButtons: { mode: 'topology' | 'geo' | 'table'; icon: typeof Network; label: string; shortLabel: string }[] = [
-    { mode: 'table', icon: Table, label: 'Table', shortLabel: 'Tab' },
+  const viewButtons: { mode: 'topology' | 'geo' | 'table' | 'physical'; icon: typeof Network; label: string; shortLabel: string }[] = [
     { mode: 'topology', icon: Network, label: 'Topology', shortLabel: 'Topo' },
     { mode: 'geo', icon: Map, label: 'Geo Map', shortLabel: 'Geo' },
+    { mode: 'table', icon: Table, label: 'Table', shortLabel: 'Tab' },
+    { mode: 'physical', icon: Cable, label: 'Physical', shortLabel: 'L1' },
   ]
 
-  const handleViewChange = (mode: 'topology' | 'geo' | 'table') => {
+  const handleViewChange = (mode: 'topology' | 'geo' | 'table' | 'physical') => {
     if (!projectId) return
     if (mode === 'table') {
       navigate(`/projects/${projectId}/table/hosts`)
