@@ -12,23 +12,27 @@ export function AppShell() {
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
+  const detailPanelWidth = useUIStore((s) => s.detailPanelWidth)
+  const setDetailPanelWidth = useUIStore((s) => s.setDetailPanelWidth)
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
-  const dragging = useRef(false)
+  const draggingSidebar = useRef(false)
+  const draggingDetail = useRef(false)
 
-  const onMouseDown = useCallback(
+  // ── Left sidebar drag ──
+  const onSidebarMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
-      dragging.current = true
+      draggingSidebar.current = true
       const startX = e.clientX
       const startW = sidebarWidth
 
       const onMouseMove = (ev: MouseEvent) => {
-        if (!dragging.current) return
+        if (!draggingSidebar.current) return
         setSidebarWidth(startW + (ev.clientX - startX))
       }
 
       const onMouseUp = () => {
-        dragging.current = false
+        draggingSidebar.current = false
         document.removeEventListener('mousemove', onMouseMove)
         document.removeEventListener('mouseup', onMouseUp)
         document.body.style.cursor = ''
@@ -43,19 +47,19 @@ export function AppShell() {
     [sidebarWidth, setSidebarWidth],
   )
 
-  const onTouchStart = useCallback(
+  const onSidebarTouchStart = useCallback(
     (e: React.TouchEvent) => {
-      dragging.current = true
+      draggingSidebar.current = true
       const startX = e.touches[0].clientX
       const startW = sidebarWidth
 
       const onTouchMove = (ev: TouchEvent) => {
-        if (!dragging.current) return
+        if (!draggingSidebar.current) return
         setSidebarWidth(startW + (ev.touches[0].clientX - startX))
       }
 
       const onTouchEnd = () => {
-        dragging.current = false
+        draggingSidebar.current = false
         document.removeEventListener('touchmove', onTouchMove)
         document.removeEventListener('touchend', onTouchEnd)
       }
@@ -65,6 +69,60 @@ export function AppShell() {
     },
     [sidebarWidth, setSidebarWidth],
   )
+
+  // ── Right detail panel drag ──
+  const onDetailMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      draggingDetail.current = true
+      const startX = e.clientX
+      const startW = detailPanelWidth
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!draggingDetail.current) return
+        setDetailPanelWidth(startW - (ev.clientX - startX))
+      }
+
+      const onMouseUp = () => {
+        draggingDetail.current = false
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+    },
+    [detailPanelWidth, setDetailPanelWidth],
+  )
+
+  const onDetailTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      draggingDetail.current = true
+      const startX = e.touches[0].clientX
+      const startW = detailPanelWidth
+
+      const onTouchMove = (ev: TouchEvent) => {
+        if (!draggingDetail.current) return
+        setDetailPanelWidth(startW - (ev.touches[0].clientX - startX))
+      }
+
+      const onTouchEnd = () => {
+        draggingDetail.current = false
+        document.removeEventListener('touchmove', onTouchMove)
+        document.removeEventListener('touchend', onTouchEnd)
+      }
+
+      document.addEventListener('touchmove', onTouchMove, { passive: true })
+      document.addEventListener('touchend', onTouchEnd)
+    },
+    [detailPanelWidth, setDetailPanelWidth],
+  )
+
+  const isDragging = draggingSidebar.current || draggingDetail.current
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -84,13 +142,13 @@ export function AppShell() {
           className="shrink-0 overflow-hidden hidden md:flex"
           style={{
             width: sidebarOpen ? sidebarWidth + 4 : 0,
-            transition: dragging.current ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: isDragging ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
           <Sidebar style={{ width: sidebarWidth, minWidth: sidebarWidth }} />
           <div
-            onMouseDown={onMouseDown}
-            onTouchStart={onTouchStart}
+            onMouseDown={onSidebarMouseDown}
+            onTouchStart={onSidebarTouchStart}
             className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors touch-none"
           />
         </div>
@@ -119,13 +177,18 @@ export function AppShell() {
 
         {/* ── Right Detail Panel (Desktop) — width transition ── */}
         <div
-          className="shrink-0 overflow-hidden hidden md:block"
+          className="shrink-0 overflow-hidden hidden md:flex"
           style={{
-            width: detailPanelOpen ? 320 : 0,
-            transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            width: detailPanelOpen ? detailPanelWidth + 4 : 0,
+            transition: isDragging ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          <DetailPanel className="w-80 min-w-80" />
+          <div
+            onMouseDown={onDetailMouseDown}
+            onTouchStart={onDetailTouchStart}
+            className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors touch-none"
+          />
+          <DetailPanel style={{ width: detailPanelWidth, minWidth: detailPanelWidth }} />
         </div>
 
         {/* ── Right Detail Panel (Mobile) — slide transition ── */}
