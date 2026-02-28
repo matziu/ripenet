@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-02-28
+
+### Added
+- Resizable detail panel — drag left edge to resize, width persisted in localStorage
+
+### Fixed
+- Detail panel not scrolling when content exceeds panel height
+- Dark mode scrollbar now styled consistently across all browsers (webkit + Firefox)
+
+---
+
 ## [1.1.0] - 2026-02-28
 
 ### Added
