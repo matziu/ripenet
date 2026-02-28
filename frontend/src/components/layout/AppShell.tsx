@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { DetailPanel } from './DetailPanel'
@@ -122,83 +122,93 @@ export function AppShell() {
     [detailPanelWidth, setDetailPanelWidth],
   )
 
+  const location = useLocation()
+  const isSettingsPage = location.pathname.startsWith('/settings')
   const isDragging = draggingSidebar.current || draggingDetail.current
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <TopBar />
       <div className="flex flex-1 overflow-hidden relative">
-        {/* ── Mobile overlay backdrops ── */}
-        <div
-          className={cn(
-            'fixed inset-0 z-30 bg-black/40 md:hidden transition-opacity duration-300',
-            sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
-          )}
-          onClick={toggleSidebar}
-        />
+        {!isSettingsPage && (
+          <>
+            {/* ── Mobile overlay backdrops ── */}
+            <div
+              className={cn(
+                'fixed inset-0 z-30 bg-black/40 md:hidden transition-opacity duration-300',
+                sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+              )}
+              onClick={toggleSidebar}
+            />
 
-        {/* ── Left Sidebar (Desktop) — width transition ── */}
-        <div
-          className="shrink-0 overflow-hidden hidden md:flex"
-          style={{
-            width: sidebarOpen ? sidebarWidth + 4 : 0,
-            transition: isDragging ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
-          <Sidebar style={{ width: sidebarWidth, minWidth: sidebarWidth }} />
-          <div
-            onMouseDown={onSidebarMouseDown}
-            onTouchStart={onSidebarTouchStart}
-            className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors touch-none"
-          />
-        </div>
+            {/* ── Left Sidebar (Desktop) — width transition ── */}
+            <div
+              className="shrink-0 overflow-hidden hidden md:flex"
+              style={{
+                width: sidebarOpen ? sidebarWidth + 4 : 0,
+                transition: isDragging ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >
+              <Sidebar style={{ width: sidebarWidth, minWidth: sidebarWidth }} />
+              <div
+                onMouseDown={onSidebarMouseDown}
+                onTouchStart={onSidebarTouchStart}
+                className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors touch-none"
+              />
+            </div>
 
-        {/* ── Left Sidebar (Mobile) — slide transition ── */}
-        <Sidebar
-          className={cn(
-            'fixed inset-y-0 left-0 z-40 top-12 w-72 shadow-xl md:hidden',
-            'transition-transform duration-300 ease-out',
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          )}
-        />
+            {/* ── Left Sidebar (Mobile) — slide transition ── */}
+            <Sidebar
+              className={cn(
+                'fixed inset-y-0 left-0 z-40 top-12 w-72 shadow-xl md:hidden',
+                'transition-transform duration-300 ease-out',
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+              )}
+            />
+          </>
+        )}
 
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
 
-        {/* ── Right Detail Panel backdrop (Mobile) ── */}
-        <div
-          className={cn(
-            'fixed inset-0 z-30 bg-black/40 md:hidden transition-opacity duration-300',
-            detailPanelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
-          )}
-          onClick={toggleDetailPanel}
-        />
+        {!isSettingsPage && (
+          <>
+            {/* ── Right Detail Panel backdrop (Mobile) ── */}
+            <div
+              className={cn(
+                'fixed inset-0 z-30 bg-black/40 md:hidden transition-opacity duration-300',
+                detailPanelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
+              )}
+              onClick={toggleDetailPanel}
+            />
 
-        {/* ── Right Detail Panel (Desktop) — width transition ── */}
-        <div
-          className="shrink-0 overflow-hidden hidden md:flex"
-          style={{
-            width: detailPanelOpen ? detailPanelWidth + 4 : 0,
-            transition: isDragging ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
-          <div
-            onMouseDown={onDetailMouseDown}
-            onTouchStart={onDetailTouchStart}
-            className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors touch-none"
-          />
-          <DetailPanel style={{ width: detailPanelWidth, minWidth: detailPanelWidth }} />
-        </div>
+            {/* ── Right Detail Panel (Desktop) — width transition ── */}
+            <div
+              className="shrink-0 overflow-hidden hidden md:flex"
+              style={{
+                width: detailPanelOpen ? detailPanelWidth + 4 : 0,
+                transition: isDragging ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >
+              <div
+                onMouseDown={onDetailMouseDown}
+                onTouchStart={onDetailTouchStart}
+                className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors touch-none"
+              />
+              <DetailPanel style={{ width: detailPanelWidth, minWidth: detailPanelWidth }} />
+            </div>
 
-        {/* ── Right Detail Panel (Mobile) — slide transition ── */}
-        <DetailPanel
-          className={cn(
-            'fixed inset-y-0 right-0 z-40 top-12 w-80 shadow-xl md:hidden',
-            'transition-transform duration-300 ease-out',
-            detailPanelOpen ? 'translate-x-0' : 'translate-x-full',
-          )}
-        />
+            {/* ── Right Detail Panel (Mobile) — slide transition ── */}
+            <DetailPanel
+              className={cn(
+                'fixed inset-y-0 right-0 z-40 top-12 w-80 shadow-xl md:hidden',
+                'transition-transform duration-300 ease-out',
+                detailPanelOpen ? 'translate-x-0' : 'translate-x-full',
+              )}
+            />
+          </>
+        )}
       </div>
     </div>
   )

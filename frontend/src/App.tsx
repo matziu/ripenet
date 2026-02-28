@@ -7,7 +7,6 @@ import { ProjectPage } from '@/pages/ProjectPage'
 import { ProjectsListPage } from '@/pages/ProjectsListPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { WizardPage } from '@/pages/WizardPage'
-import { UsersPage } from '@/pages/UsersPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { useUIStore } from '@/stores/ui.store'
@@ -65,7 +64,7 @@ function App() {
           <Route path="/projects" element={<ProjectsListPage />} />
           <Route path="/projects/:projectId/*" element={<ProjectPage />} />
           <Route path="/wizard" element={<WizardPage />} />
-          <Route path="/users" element={<UsersPage />} />
+          <Route path="/users" element={<Navigate to="/settings/users" replace />} />
           <Route path="/settings/*" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
