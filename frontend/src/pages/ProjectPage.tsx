@@ -4,14 +4,15 @@ import { projectsApi } from '@/api/endpoints'
 import { TopologyCanvas } from '@/components/topology/TopologyCanvas'
 import { GeoMap } from '@/components/geo/GeoMap'
 import { ProjectTableView } from '@/components/data/tables/ProjectTableView'
+import { PhysicalCanvas } from '@/components/physical/PhysicalCanvas'
 
 import { useEffect } from 'react'
 import { useSelectionStore } from '@/stores/selection.store'
 
 function parseView(wildcard: string | undefined) {
   if (!wildcard) return undefined
-  const view = wildcard.split('/')[0] as 'topology' | 'geo' | 'table'
-  if (view === 'topology' || view === 'geo' || view === 'table') return view
+  const view = wildcard.split('/')[0] as 'topology' | 'geo' | 'table' | 'physical'
+  if (view === 'topology' || view === 'geo' || view === 'table' || view === 'physical') return view
   return undefined
 }
 
@@ -41,6 +42,7 @@ export function ProjectPage() {
       if (e.key === '1') navigate(`/projects/${id}/table`, { replace: true })
       else if (e.key === '2') navigate(`/projects/${id}/topology`, { replace: true })
       else if (e.key === '3') navigate(`/projects/${id}/geo`, { replace: true })
+      else if (e.key === '4') navigate(`/projects/${id}/physical`, { replace: true })
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
@@ -72,6 +74,7 @@ export function ProjectPage() {
           <kbd className="rounded border border-border px-1">1</kbd> Topo
           <kbd className="rounded border border-border px-1 ml-2">2</kbd> Geo
           <kbd className="rounded border border-border px-1 ml-2">3</kbd> Table
+          <kbd className="rounded border border-border px-1 ml-2">4</kbd> Physical
         </div>
       </div>
 
@@ -80,6 +83,7 @@ export function ProjectPage() {
         {view === 'topology' && <TopologyCanvas projectId={id} />}
         {view === 'geo' && <GeoMap projectId={id} />}
         {view === 'table' && <ProjectTableView projectId={id} />}
+        {view === 'physical' && <PhysicalCanvas projectId={id} />}
       </div>
     </div>
   )
