@@ -1,6 +1,6 @@
 import { Panel } from '@xyflow/react'
 import { LayoutGrid } from 'lucide-react'
-import { cableTypeColors } from './CableEdge'
+import { getCableColor } from './CableEdge'
 
 const cableTypeLabels: Record<string, string> = {
   fiber_sm: 'Fiber SM',
@@ -37,7 +37,7 @@ export function PhysicalToolbar({ onRelayout, visibleCableTypes }: PhysicalToolb
             </div>
             <div className="space-y-1">
               {visibleCableTypes.map((type) => {
-                const color = cableTypeColors[type] ?? '#64748b'
+                const color = getCableColor(type)
                 const label = cableTypeLabels[type] ?? type
                 return (
                   <div
