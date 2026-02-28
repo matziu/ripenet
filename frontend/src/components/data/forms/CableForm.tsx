@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cablesApi, physicalTopologyApi } from '@/api/endpoints'
@@ -102,25 +102,29 @@ export function CableForm({ siteId, cable, onClose }: CableFormProps) {
     return ''
   }, [cable, topology])
 
-  const { register, handleSubmit, watch, control } = useForm<FormValues>({
-    defaultValues: cable
-      ? {
-          device_a: initialDeviceA,
-          port_a: String(cable.port_a),
-          device_b: initialDeviceB,
-          port_b: String(cable.port_b),
-          cable_type: cable.cable_type,
-          label: cable.label,
-        }
-      : {
-          device_a: '',
-          port_a: '',
-          device_b: '',
-          port_b: '',
-          cable_type: 'cat6',
-          label: '',
-        },
+  const { register, handleSubmit, watch, control, setValue, reset } = useForm<FormValues>({
+    defaultValues: {
+      device_a: '',
+      port_a: '',
+      device_b: '',
+      port_b: '',
+      cable_type: cable?.cable_type ?? 'cat6',
+      label: cable?.label ?? '',
+    },
   })
+
+  // Sync device/port fields when topology loads (edit mode)
+  useEffect(() => {
+    if (!cable || !initialDeviceA || !initialDeviceB) return
+    reset({
+      device_a: initialDeviceA,
+      port_a: String(cable.port_a),
+      device_b: initialDeviceB,
+      port_b: String(cable.port_b),
+      cable_type: cable.cable_type,
+      label: cable.label,
+    })
+  }, [cable, initialDeviceA, initialDeviceB, reset])
 
   const watchDeviceA = watch('device_a')
   const watchDeviceB = watch('device_b')
@@ -186,6 +190,10 @@ export function CableForm({ siteId, cable, onClose }: CableFormProps) {
             render={({ field }) => (
               <select
                 {...field}
+                onChange={(e) => {
+                  field.onChange(e)
+                  setValue('port_a', '')
+                }}
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
               >
                 <option value="">Select device...</option>
@@ -232,6 +240,10 @@ export function CableForm({ siteId, cable, onClose }: CableFormProps) {
             render={({ field }) => (
               <select
                 {...field}
+                onChange={(e) => {
+                  field.onChange(e)
+                  setValue('port_b', '')
+                }}
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
               >
                 <option value="">Select device...</option>
