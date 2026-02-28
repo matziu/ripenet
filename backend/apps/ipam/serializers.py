@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from apps.projects.models import Project, Site
 from apps.projects.serializers import SiteWanAddressSerializer
-from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType, PortTemplate, DevicePort, PatchPanel, Cable
+from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType, PortProfile, PortTemplate, DevicePort, PatchPanel, Cable
 from .validators import (
     check_ip_duplicate_in_project, check_ip_in_subnet, check_subnet_overlap,
     check_pool_range_in_subnet, check_pool_overlap, check_static_ip_not_in_pool, check_lease_ip_in_pool,
@@ -14,7 +14,7 @@ from .validators import (
 class DeviceTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeviceType
-        fields = ["id", "value", "label", "position"]
+        fields = ["id", "value", "label", "color", "position"]
         read_only_fields = ["id"]
 
     def validate_value(self, value):
@@ -286,10 +286,19 @@ class ProjectTopologySerializer(serializers.Serializer):
     standalone_subnets = SubnetTopologySerializer(many=True, read_only=True)
 
 
+class PortProfileSerializer(serializers.ModelSerializer):
+    entry_count = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = PortProfile
+        fields = ["id", "name", "description", "entry_count"]
+        read_only_fields = ["id"]
+
+
 class PortTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PortTemplate
-        fields = ["id", "device_type", "name", "port_type", "position"]
+        fields = ["id", "profile", "name", "port_type", "position"]
         read_only_fields = ["id"]
 
 

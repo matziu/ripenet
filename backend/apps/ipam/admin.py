@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import VLAN, Host, Subnet, Tunnel, DeviceType, PortTemplate, DevicePort, PatchPanel, Cable
+from .models import VLAN, Host, Subnet, Tunnel, DeviceType, PortTemplate, PortProfile, DevicePort, PatchPanel, Cable
 
 
 class SubnetInline(admin.TabularInline):
@@ -43,8 +43,14 @@ class PortTemplateInline(admin.TabularInline):
 
 @admin.register(DeviceType)
 class DeviceTypeAdmin(admin.ModelAdmin):
-    list_display = ("value", "label", "position")
+    list_display = ("value", "label", "color", "position")
     ordering = ("position",)
+
+
+@admin.register(PortProfile)
+class PortProfileAdmin(admin.ModelAdmin):
+    list_display = ("name", "description")
+    search_fields = ("name",)
     inlines = [PortTemplateInline]
 
 

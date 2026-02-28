@@ -9,6 +9,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useUpdateNodeInternals,
   type NodeTypes,
   type EdgeTypes,
   type Node,
@@ -16,8 +17,6 @@ import {
   type OnNodesChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import dagre from 'dagre'
-
 import { useQuery } from '@tanstack/react-query'
 import { physicalTopologyApi } from '@/api/endpoints'
 import { useSelectionStore } from '@/stores/selection.store'
@@ -27,8 +26,10 @@ import { PatchPanelNode, PP_NODE_WIDTH, PP_NODE_HEADER_HEIGHT, PP_NODE_PORT_HEIG
 import type { PatchPanelNodeData } from './PatchPanelNode'
 import { CableEdge } from './CableEdge'
 import { PhysicalToolbar } from './PhysicalToolbar'
-import type { PhysicalTopology } from '@/types'
+import { PhysicalTableView } from './PhysicalTableView'
+import type { PhysicalTopology, DeviceTypeOption } from '@/types'
 import { Cable, Server, Grid3X3 } from 'lucide-react'
+import { useDeviceTypes } from '@/hooks/useDeviceTypes'
 
 const nodeTypes: NodeTypes = {
   hostNode: HostNode,
@@ -65,60 +66,159 @@ function clearPhysicalPositions(siteId: number) {
   localStorage.removeItem(`physical-layout-${siteId}`)
 }
 
-// --- Dagre layout for physical topology ---
+// --- Schematic layout: columns by device role + barycenter crossing minimization ---
 
-function applyPhysicalDagreLayout(
+const CORE_DEVICE_TYPES = new Set([
+  'router', 'switch', 'firewall', 'load_balancer',
+  'core_switch', 'distribution_switch',
+])
+
+function getNodeHeight(node: Node): number {
+  const ports = ((node.data as { ports?: unknown[] }).ports?.length ?? 0)
+  return node.type === 'hostNode'
+    ? HOST_NODE_HEADER_HEIGHT + ports * HOST_NODE_PORT_HEIGHT + 12
+    : PP_NODE_HEADER_HEIGHT + ports * PP_NODE_PORT_HEIGHT + 12
+}
+
+function applySchematicLayout(
   nodes: Node[],
   edges: Edge[],
 ): { nodes: Node[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph()
-  g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({
-    rankdir: 'TB',
-    nodesep: 100,
-    ranksep: 200,
-    edgesep: 20,
+  if (nodes.length === 0) return { nodes, edges }
+
+  // Build adjacency list
+  const adj = new Map<string, string[]>()
+  nodes.forEach((n) => adj.set(n.id, []))
+  edges.forEach((e) => {
+    adj.get(e.source)?.push(e.target)
+    adj.get(e.target)?.push(e.source)
   })
 
-  nodes.forEach((node) => {
-    const portCount = (node.data as { ports?: unknown[] }).ports?.length ?? 0
-    let w: number
-    let h: number
-    if (node.type === 'hostNode') {
-      w = HOST_NODE_WIDTH
-      h = HOST_NODE_HEADER_HEIGHT + portCount * HOST_NODE_PORT_HEIGHT + 12
+  // Classify nodes into 3 columns: core | patch panels | endpoints
+  const columns: Node[][] = [[], [], []]
+  const nodeCol = new Map<string, number>()
+
+  for (const node of nodes) {
+    let col: number
+    if (node.type === 'patchPanelNode') {
+      col = 1
     } else {
-      w = PP_NODE_WIDTH
-      h = PP_NODE_HEADER_HEIGHT + portCount * PP_NODE_PORT_HEIGHT + 12
+      const dt = ((node.data as HostNodeData).device_type || '').toLowerCase()
+      col = CORE_DEVICE_TYPES.has(dt) ? 0 : 2
     }
-    g.setNode(node.id, { width: w + 30, height: h + 30 })
-  })
+    columns[col].push(node)
+    nodeCol.set(node.id, col)
+  }
 
-  edges.forEach((edge) => {
-    g.setEdge(edge.source, edge.target)
-  })
-
-  dagre.layout(g)
-
-  const layoutedNodes = nodes.map((node) => {
-    const n = g.node(node.id)
-    const portCount = (node.data as { ports?: unknown[] }).ports?.length ?? 0
-    let w: number
-    let h: number
-    if (node.type === 'hostNode') {
-      w = HOST_NODE_WIDTH
-      h = HOST_NODE_HEADER_HEIGHT + portCount * HOST_NODE_PORT_HEIGHT + 12
-    } else {
-      w = PP_NODE_WIDTH
-      h = PP_NODE_HEADER_HEIGHT + portCount * PP_NODE_PORT_HEIGHT + 12
+  // Compact: remove empty columns, track mapping
+  const activeCols: Node[][] = []
+  const origToActive = new Map<number, number>()
+  for (let i = 0; i < columns.length; i++) {
+    if (columns[i].length > 0) {
+      origToActive.set(i, activeCols.length)
+      activeCols.push(columns[i])
     }
+  }
+
+  const nodeActiveCol = new Map<string, number>()
+  for (const node of nodes) {
+    const orig = nodeCol.get(node.id) ?? 2
+    nodeActiveCol.set(node.id, origToActive.get(orig) ?? 0)
+  }
+
+  // Deterministic initial sort
+  for (const col of activeCols) {
+    col.sort((a, b) => a.id.localeCompare(b.id))
+  }
+
+  // Assign Y positions (stacked top-down per column)
+  const GAP = 30
+  const nodeY = new Map<string, number>()
+
+  const assignY = () => {
+    for (const col of activeCols) {
+      let y = 0
+      for (const node of col) {
+        nodeY.set(node.id, y)
+        y += getNodeHeight(node) + GAP
+      }
+    }
+  }
+  assignY()
+
+  // Barycenter iterations to minimize edge crossings
+  for (let iter = 0; iter < 8; iter++) {
+    // Forward pass (left → right)
+    for (let ci = 1; ci < activeCols.length; ci++) {
+      const col = activeCols[ci]
+      const bary = new Map<string, number>()
+      for (const node of col) {
+        const nbrs = (adj.get(node.id) || []).filter((nid) => {
+          const nc = nodeActiveCol.get(nid)
+          return nc !== undefined && nc < ci
+        })
+        bary.set(
+          node.id,
+          nbrs.length > 0
+            ? nbrs.reduce((s, nid) => s + (nodeY.get(nid) ?? 0), 0) / nbrs.length
+            : (nodeY.get(node.id) ?? 0),
+        )
+      }
+      col.sort((a, b) => (bary.get(a.id) ?? 0) - (bary.get(b.id) ?? 0))
+    }
+    // Backward pass (right → left)
+    for (let ci = activeCols.length - 2; ci >= 0; ci--) {
+      const col = activeCols[ci]
+      const bary = new Map<string, number>()
+      for (const node of col) {
+        const nbrs = (adj.get(node.id) || []).filter((nid) => {
+          const nc = nodeActiveCol.get(nid)
+          return nc !== undefined && nc > ci
+        })
+        bary.set(
+          node.id,
+          nbrs.length > 0
+            ? nbrs.reduce((s, nid) => s + (nodeY.get(nid) ?? 0), 0) / nbrs.length
+            : (nodeY.get(node.id) ?? 0),
+        )
+      }
+      col.sort((a, b) => (bary.get(a.id) ?? 0) - (bary.get(b.id) ?? 0))
+    }
+    assignY()
+  }
+
+  // Center columns vertically relative to the tallest one
+  const colHeights = activeCols.map((col) => {
+    let h = 0
+    for (const node of col) h += getNodeHeight(node) + GAP
+    return Math.max(0, h - GAP)
+  })
+  const maxH = Math.max(...colHeights, 0)
+  const colYOffset = colHeights.map((h) => (maxH - h) / 2)
+
+  // Assign X positions per column
+  const COL_SPACING = 300
+  const colX: number[] = []
+  let x = 0
+  for (const col of activeCols) {
+    colX.push(x)
+    const maxW = Math.max(...col.map((n) => (n.type === 'hostNode' ? HOST_NODE_WIDTH : PP_NODE_WIDTH)))
+    x += maxW + COL_SPACING
+  }
+
+  // Apply positions
+  const positioned = nodes.map((node) => {
+    const ci = nodeActiveCol.get(node.id) ?? 0
     return {
       ...node,
-      position: { x: n.x - w / 2, y: n.y - h / 2 },
+      position: {
+        x: colX[ci] ?? 0,
+        y: (nodeY.get(node.id) ?? 0) + (colYOffset[ci] ?? 0),
+      },
     }
   })
 
-  return { nodes: layoutedNodes, edges }
+  return { nodes: positioned, edges }
 }
 
 // --- Convert API data to React Flow ---
@@ -126,6 +226,7 @@ function applyPhysicalDagreLayout(
 function physicalToFlow(
   data: PhysicalTopology,
   savedPositions?: Record<string, { x: number; y: number }>,
+  deviceTypeMap?: Map<string, DeviceTypeOption>,
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = []
   const edges: Edge[] = []
@@ -146,9 +247,13 @@ function physicalToFlow(
 
   data.hosts.forEach((host) => {
     const nodeId = `host-${host.id}`
+    const dt = deviceTypeMap?.get(host.device_type)
     const nodeData: HostNodeData = {
       ...host,
       connectedPorts: connectedPortIds,
+      portSide: 'right',
+      color: dt?.color,
+      device_type_label: dt?.label,
     }
     nodes.push({
       id: nodeId,
@@ -209,12 +314,63 @@ function physicalToFlow(
     }
   })
 
-  // Apply dagre layout if no saved positions
+  // Apply layout if no saved positions
+  let result: { nodes: Node[]; edges: Edge[] }
   if (!savedPositions || Object.keys(savedPositions).length === 0) {
-    return applyPhysicalDagreLayout(nodes, edges)
+    result = applySchematicLayout(nodes, edges)
+  } else {
+    result = { nodes, edges }
   }
 
-  return { nodes, edges }
+  // Compute portSide for each host based on neighbor positions
+  const posMap = new Map<string, number>()
+  for (const n of result.nodes) posMap.set(n.id, n.position.x)
+
+  const adj = new Map<string, string[]>()
+  for (const n of result.nodes) adj.set(n.id, [])
+  for (const e of result.edges) {
+    adj.get(e.source)?.push(e.target)
+    adj.get(e.target)?.push(e.source)
+  }
+
+  for (const node of result.nodes) {
+    if (node.type !== 'hostNode') continue
+    const myX = posMap.get(node.id) ?? 0
+    const neighbors = adj.get(node.id) ?? []
+    if (neighbors.length === 0) continue
+    const avgX = neighbors.reduce((s, nid) => s + (posMap.get(nid) ?? 0), 0) / neighbors.length
+    ;(node.data as HostNodeData).portSide = avgX >= myX ? 'right' : 'left'
+  }
+
+  return result
+}
+
+// --- Recompute port sides based on current node positions ---
+
+function recomputePortSides(nodes: Node[], edges: Edge[]): Node[] {
+  const posMap = new Map<string, number>()
+  for (const n of nodes) posMap.set(n.id, n.position.x)
+
+  const adj = new Map<string, string[]>()
+  for (const n of nodes) adj.set(n.id, [])
+  for (const e of edges) {
+    adj.get(e.source)?.push(e.target)
+    adj.get(e.target)?.push(e.source)
+  }
+
+  let changed = false
+  const result = nodes.map((node) => {
+    if (node.type !== 'hostNode') return node
+    const myX = posMap.get(node.id) ?? 0
+    const neighbors = adj.get(node.id) ?? []
+    if (neighbors.length === 0) return node
+    const avgX = neighbors.reduce((s, nid) => s + (posMap.get(nid) ?? 0), 0) / neighbors.length
+    const newSide = avgX >= myX ? 'right' : 'left'
+    if ((node.data as HostNodeData).portSide === newSide) return node
+    changed = true
+    return { ...node, data: { ...node.data, portSide: newSide } }
+  })
+  return changed ? result : nodes
 }
 
 // --- Stats panel ---
@@ -244,11 +400,14 @@ function PhysicalStats({ data }: { data: PhysicalTopology }) {
 
 interface PhysicalCanvasInnerProps {
   siteId: number
+  viewMode: 'graph' | 'table'
+  onViewModeChange: (mode: 'graph' | 'table') => void
 }
 
-function PhysicalCanvasInner({ siteId }: PhysicalCanvasInnerProps) {
+function PhysicalCanvasInner({ siteId, viewMode, onViewModeChange }: PhysicalCanvasInnerProps) {
   const { fitView } = useReactFlow()
   const [layoutKey, setLayoutKey] = useState(0)
+  const deviceTypeMap = useDeviceTypes()
 
   const { data: physicalData, isLoading } = useQuery({
     queryKey: ['physical-topology', siteId],
@@ -260,28 +419,41 @@ function PhysicalCanvasInner({ siteId }: PhysicalCanvasInnerProps) {
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!physicalData) return { nodes: [], edges: [] }
     const positions = loadPhysicalPositions(siteId)
-    return physicalToFlow(physicalData, positions)
+    return physicalToFlow(physicalData, positions, deviceTypeMap)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [physicalData, siteId, layoutKey])
+  }, [physicalData, siteId, layoutKey, deviceTypeMap])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
   const nodesRef = useRef(nodes)
   nodesRef.current = nodes
+  const edgesRef = useRef(edges)
+  edgesRef.current = edges
+
+  // Force React Flow to recalculate handle positions after data/layout changes
+  const updateNodeInternals = useUpdateNodeInternals()
 
   useEffect(() => {
     setNodes(initialNodes)
     setEdges(initialEdges)
-  }, [initialNodes, initialEdges, setNodes, setEdges])
+    // Handles may have moved (portSide changed) — tell React Flow to re-measure
+    const hostIds = initialNodes.filter((n) => n.type === 'hostNode').map((n) => n.id)
+    if (hostIds.length > 0) {
+      // Wait for DOM to paint with new handle positions, then re-measure
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => updateNodeInternals(hostIds))
+      })
+    }
+  }, [initialNodes, initialEdges, setNodes, setEdges, updateNodeInternals])
 
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
       onNodesChange(changes)
-      const hasPositionChange = changes.some(
+      const hasDragStop = changes.some(
         (c) => c.type === 'position' && !c.dragging && c.position,
       )
-      if (hasPositionChange) {
+      if (hasDragStop) {
         requestAnimationFrame(() => {
           savePhysicalPositions(siteId, nodesRef.current)
         })
@@ -289,6 +461,24 @@ function PhysicalCanvasInner({ siteId }: PhysicalCanvasInnerProps) {
     },
     [onNodesChange, siteId],
   )
+
+  // Recompute port sides live during drag + force handle recalculation
+  const onNodeDrag = useCallback(() => {
+    setNodes((prev) => {
+      const next = recomputePortSides(prev, edgesRef.current)
+      if (next !== prev) {
+        // Collect IDs of nodes whose portSide changed
+        const changed: string[] = []
+        for (let i = 0; i < next.length; i++) {
+          if (next[i] !== prev[i]) changed.push(next[i].id)
+        }
+        if (changed.length > 0) {
+          requestAnimationFrame(() => updateNodeInternals(changed))
+        }
+      }
+      return next
+    })
+  }, [setNodes, updateNodeInternals])
 
   const onNodeDragStop = useCallback(() => {
     savePhysicalPositions(siteId, nodesRef.current)
@@ -347,6 +537,7 @@ function PhysicalCanvasInner({ siteId }: PhysicalCanvasInnerProps) {
       edges={edges}
       onNodesChange={handleNodesChange}
       onEdgesChange={onEdgesChange}
+      onNodeDrag={onNodeDrag}
       onNodeDragStop={onNodeDragStop}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
@@ -358,7 +549,7 @@ function PhysicalCanvasInner({ siteId }: PhysicalCanvasInnerProps) {
       <Background variant={BackgroundVariant.Dots} gap={16} size={1} className="!text-border/40" />
       <Controls className="!bg-card !border-border/50 !shadow-md !rounded-lg [&>button]:!bg-card [&>button]:!border-border/50 [&>button]:!text-foreground [&>button:hover]:!bg-accent [&>button>svg]:!fill-foreground" />
       <PhysicalStats data={physicalData} />
-      <PhysicalToolbar onRelayout={handleRelayout} visibleCableTypes={visibleCableTypes} />
+      <PhysicalToolbar onRelayout={handleRelayout} visibleCableTypes={visibleCableTypes} viewMode={viewMode} onViewModeChange={onViewModeChange} />
     </ReactFlow>
   )
 }
@@ -367,10 +558,24 @@ function PhysicalCanvasInner({ siteId }: PhysicalCanvasInnerProps) {
 
 interface PhysicalCanvasProps {
   projectId: number
+  urlSiteId: number | null
+  urlViewMode: 'graph' | 'table'
+  onNavigate: (siteId: number | null, mode: 'graph' | 'table') => void
 }
 
-export function PhysicalCanvas({ projectId: _projectId }: PhysicalCanvasProps) {
-  const selectedSiteId = useSelectionStore((s) => s.selectedSiteId)
+export function PhysicalCanvas({ projectId: _projectId, urlSiteId, urlViewMode, onNavigate }: PhysicalCanvasProps) {
+  const storeSiteId = useSelectionStore((s) => s.selectedSiteId)
+  const selectedSiteId = urlSiteId ?? storeSiteId
+  const viewMode = urlViewMode
+
+  const handleViewModeChange = useCallback(
+    (mode: 'graph' | 'table') => {
+      if (selectedSiteId) {
+        onNavigate(selectedSiteId, mode)
+      }
+    },
+    [selectedSiteId, onNavigate],
+  )
 
   if (!selectedSiteId) {
     return (
@@ -390,9 +595,15 @@ export function PhysicalCanvas({ projectId: _projectId }: PhysicalCanvasProps) {
     )
   }
 
+  if (viewMode === 'table') {
+    return (
+      <PhysicalTableView siteId={selectedSiteId} viewMode={viewMode} onViewModeChange={handleViewModeChange} />
+    )
+  }
+
   return (
     <ReactFlowProvider>
-      <PhysicalCanvasInner siteId={selectedSiteId} />
+      <PhysicalCanvasInner siteId={selectedSiteId} viewMode={viewMode} onViewModeChange={handleViewModeChange} />
     </ReactFlowProvider>
   )
 }

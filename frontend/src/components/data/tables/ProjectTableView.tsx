@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { Site, VLAN, Subnet, Host, Tunnel, DHCPPool } from '@/types'
 import { useDeviceTypeLabel } from '@/hooks/useDeviceTypeLabel'
+import { useDeviceTypes } from '@/hooks/useDeviceTypes'
 
 // ─── Tree node types ──────────────────────────────────────────
 
@@ -562,6 +563,7 @@ function SubnetRow({
   indent: 'vlan' | 'site'
 }) {
   const getLabel = useDeviceTypeLabel()
+  const dtMap = useDeviceTypes()
   const subKey = `subnet-${subnetNode.subnet.id}`
   const subOpen = expanded.has(subKey)
   const pl = indent === 'vlan' ? 'pl-10 md:pl-14' : 'pl-6 md:pl-8'
@@ -618,7 +620,7 @@ function SubnetRow({
         <tr key={host.id} className="border-b border-border hover:bg-accent/20">
           <td className={cn('px-2 md:px-3 py-1.5', childPl)}>
             <span className="flex items-center gap-1.5 text-sm">
-              <Server className="h-3 w-3 text-orange-500" />
+              <Server className="h-3 w-3" style={{ color: dtMap.get(host.device_type)?.color || '#f97316' }} />
               <CopyableIP ip={host.ip_address} />
               {host.hostname && (
                 <span className="text-muted-foreground hidden sm:inline">({host.hostname})</span>
@@ -687,7 +689,7 @@ function SubnetRow({
               <tr key={host.id} className="border-b border-border hover:bg-accent/20">
                 <td className={cn('px-2 md:px-3 py-1.5', leasePl)}>
                   <span className="flex items-center gap-1.5 text-sm">
-                    <Server className="h-3 w-3 text-orange-500" />
+                    <Server className="h-3 w-3" style={{ color: dtMap.get(host.device_type)?.color || '#f97316' }} />
                     <CopyableIP ip={host.ip_address} />
                     {host.hostname && (
                       <span className="text-muted-foreground hidden sm:inline">({host.hostname})</span>

@@ -4,6 +4,7 @@ from django.db import models
 class DeviceType(models.Model):
     value = models.CharField(max_length=50, unique=True)
     label = models.CharField(max_length=100)
+    color = models.CharField(max_length=7, default="#3b82f6")
     position = models.PositiveIntegerField(default=0)
 
     class Meta:

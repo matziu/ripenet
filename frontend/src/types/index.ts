@@ -84,6 +84,7 @@ export interface DeviceTypeOption {
   id: number
   value: string
   label: string
+  color: string
   position: number
 }
 
@@ -206,10 +207,18 @@ export interface ProjectTopology {
   tunnels: TunnelTopology[]
 }
 
+// Port Profiles
+export interface PortProfile {
+  id: number
+  name: string
+  description: string
+  entry_count: number
+}
+
 // Physical topology types (L1)
 export interface PortTemplate {
   id: number
-  device_type: number
+  profile: number
   name: string
   port_type: string
   position: number

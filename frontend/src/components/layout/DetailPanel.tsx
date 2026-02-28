@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui.store'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useTopologyStore } from '@/stores/topology.store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi, portsApi, patchPanelsApi, cablesApi } from '@/api/endpoints'
+import { sitesApi, vlansApi, subnetsApi, hostsApi, tunnelsApi, dhcpPoolsApi, portsApi, patchPanelsApi, cablesApi, portProfilesApi } from '@/api/endpoints'
 import { CopyableIP } from '@/components/shared/CopyableIP'
 import { cn, extractApiError } from '@/lib/utils'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
@@ -21,7 +21,7 @@ import { toast } from 'sonner'
 import type { Host } from '@/types'
 import { useDeviceTypeLabel } from '@/hooks/useDeviceTypeLabel'
 import {
-  X, Pencil, Trash2, Plus,
+  X, Pencil, Trash2, Plus, Zap,
   MapPin, Network, Server, Monitor, Cable as CableIcon, Layers,
 } from 'lucide-react'
 
@@ -622,11 +622,26 @@ function HostPortsSection({ hostId }: { hostId: number }) {
   const queryClient = useQueryClient()
   const [addPortOpen, setAddPortOpen] = useState(false)
   const [editPortId, setEditPortId] = useState<number | null>(null)
+  const [applyProfileOpen, setApplyProfileOpen] = useState(false)
+  const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null)
 
   const { data: ports } = useQuery({
     queryKey: ['ports', { host: hostId }],
     queryFn: () => portsApi.list({ host: String(hostId) }),
     select: (res) => res.data,
+  })
+
+  const { data: profiles } = useQuery({
+    queryKey: ['port-profiles'],
+    queryFn: () => portProfilesApi.list(),
+    select: (res) => res.data,
+  })
+
+  const { data: selectedEntries } = useQuery({
+    queryKey: ['port-profile-entries', selectedProfileId],
+    queryFn: () => portProfilesApi.entries.list(selectedProfileId!),
+    select: (res) => res.data,
+    enabled: !!selectedProfileId,
   })
 
   const deletePortMutation = useMutation({
@@ -641,6 +656,18 @@ function HostPortsSection({ hostId }: { hostId: number }) {
     },
   })
 
+  const applyMutation = useMutation({
+    mutationFn: (profileId: number) => hostsApi.applyPortProfile(hostId, profileId),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['ports'] })
+      queryClient.invalidateQueries({ queryKey: ['physical-topology'] })
+      setApplyProfileOpen(false)
+      setSelectedProfileId(null)
+      toast.success(res.data.detail)
+    },
+    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to apply profile')),
+  })
+
   const editingPort = editPortId ? ports?.find((p) => p.id === editPortId) : undefined
 
   return (
@@ -649,19 +676,30 @@ function HostPortsSection({ hostId }: { hostId: number }) {
         <h4 className="text-xs font-semibold uppercase text-muted-foreground">
           Ports ({ports?.length ?? 0})
         </h4>
-        <button
-          onClick={() => setAddPortOpen(true)}
-          className="text-xs text-primary hover:underline flex items-center gap-1"
-        >
-          <Plus className="h-3 w-3" /> Port
-        </button>
+        <div className="flex items-center gap-2">
+          {profiles && profiles.length > 0 && (
+            <button
+              onClick={() => setApplyProfileOpen(true)}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+              title="Apply port profile"
+            >
+              <Zap className="h-3 w-3" /> Apply profile
+            </button>
+          )}
+          <button
+            onClick={() => setAddPortOpen(true)}
+            className="text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            <Plus className="h-3 w-3" /> Port
+          </button>
+        </div>
       </div>
       {ports && ports.length > 0 && (
         <div className="space-y-1">
           {ports.map((port) => (
             <div
               key={port.id}
-              className="flex items-center justify-between rounded-md border border-border p-2 text-xs group"
+              className="flex items-center justify-between rounded-md border border-border p-2 text-xs"
             >
               <div>
                 <span className="font-mono">{port.name}</span>
@@ -673,7 +711,7 @@ function HostPortsSection({ hostId }: { hostId: number }) {
                 </span>
                 <button
                   onClick={() => setEditPortId(port.id)}
-                  className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                   title="Edit port"
                 >
                   <Pencil className="h-3 w-3" />
@@ -682,7 +720,7 @@ function HostPortsSection({ hostId }: { hostId: number }) {
                   onClick={() => {
                     if (window.confirm(`Delete port "${port.name}"?`)) deletePortMutation.mutate(port.id)
                   }}
-                  className="p-0.5 rounded hover:bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="p-0.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500"
                   title="Delete port"
                 >
                   <Trash2 className="h-3 w-3" />
@@ -704,6 +742,50 @@ function HostPortsSection({ hostId }: { hostId: number }) {
         {editingPort && (
           <PortForm port={editingPort} onClose={() => setEditPortId(null)} />
         )}
+      </Dialog>
+
+      <Dialog open={applyProfileOpen} onOpenChange={(open) => { if (!open) { setApplyProfileOpen(false); setSelectedProfileId(null) } }} title="Apply Port Profile">
+        <div className="space-y-3">
+          <p className="text-sm">
+            Select a port profile to apply to this host.
+            Missing ports will be added. Existing ports won't be changed or deleted.
+          </p>
+          <select
+            value={selectedProfileId ?? ''}
+            onChange={(e) => setSelectedProfileId(e.target.value ? Number(e.target.value) : null)}
+            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          >
+            <option value="">Select profile...</option>
+            {profiles?.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.entry_count} ports)
+              </option>
+            ))}
+          </select>
+          {selectedEntries && selectedEntries.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">Ports ({selectedEntries.length}):</span>{' '}
+              {selectedEntries.length <= 8
+                ? selectedEntries.map((t) => t.name).join(', ')
+                : `${selectedEntries.slice(0, 5).map((t) => t.name).join(', ')}, ... ${selectedEntries.slice(-2).map((t) => t.name).join(', ')}`}
+            </div>
+          )}
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setApplyProfileOpen(false); setSelectedProfileId(null) }}
+              className="rounded-md border border-border px-4 py-1.5 text-sm hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { if (selectedProfileId) applyMutation.mutate(selectedProfileId) }}
+              disabled={!selectedProfileId || applyMutation.isPending}
+              className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {applyMutation.isPending ? 'Applying...' : 'Apply'}
+            </button>
+          </div>
+        </div>
       </Dialog>
     </div>
   )
@@ -789,7 +871,7 @@ function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
             {ports.map((port) => (
               <div
                 key={port.id}
-                className="flex items-center justify-between rounded-md border border-border p-2 text-xs group"
+                className="flex items-center justify-between rounded-md border border-border p-2 text-xs"
               >
                 <div>
                   <span className="font-mono">{port.name}</span>
@@ -801,7 +883,7 @@ function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
                   </span>
                   <button
                     onClick={() => setEditPortId(port.id)}
-                    className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                     title="Edit port"
                   >
                     <Pencil className="h-3 w-3" />
@@ -810,7 +892,7 @@ function PatchPanelDetail({ patchPanelId }: { patchPanelId: number }) {
                     onClick={() => {
                       if (window.confirm(`Delete port "${port.name}"?`)) deletePortMutation.mutate(port.id)
                     }}
-                    className="p-0.5 rounded hover:bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-0.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500"
                     title="Delete port"
                   >
                     <Trash2 className="h-3 w-3" />

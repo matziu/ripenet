@@ -1,7 +1,7 @@
 import type {
   Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool, DeviceTypeOption,
   ProjectTopology, SearchResult, PaginatedResponse, AuditLog, User, UserAdmin,
-  PortTemplate, DevicePort, PatchPanel, Cable, PhysicalTopology,
+  PortProfile, PortTemplate, DevicePort, PatchPanel, Cable, PhysicalTopology,
 } from '@/types'
 import apiClient from './client'
 
@@ -99,6 +99,8 @@ export const hostsApi = {
     apiClient.patch<Host>(`/hosts/${id}/`, data),
   delete: (id: number) =>
     apiClient.delete(`/hosts/${id}/`),
+  applyPortProfile: (hostId: number, profileId: number) =>
+    apiClient.post<{ detail: string; created: number }>(`/hosts/${hostId}/apply-port-profile/`, { profile_id: profileId }),
 }
 
 // DHCP Pools
@@ -143,18 +145,29 @@ export const usersApi = {
     apiClient.delete(`/users/${id}/`),
 }
 
-// Port Templates (nested under device-types)
-export const portTemplatesApi = {
-  list: (deviceTypeId: number) =>
-    apiClient.get<PortTemplate[]>(`/device-types/${deviceTypeId}/port-templates/`),
-  create: (deviceTypeId: number, data: Partial<PortTemplate>) =>
-    apiClient.post<PortTemplate>(`/device-types/${deviceTypeId}/port-templates/`, data),
-  update: (deviceTypeId: number, id: number, data: Partial<PortTemplate>) =>
-    apiClient.patch<PortTemplate>(`/device-types/${deviceTypeId}/port-templates/${id}/`, data),
-  delete: (deviceTypeId: number, id: number) =>
-    apiClient.delete(`/device-types/${deviceTypeId}/port-templates/${id}/`),
-  apply: (deviceTypeId: number) =>
-    apiClient.post<{ detail: string }>(`/device-types/${deviceTypeId}/port-templates/apply/`),
+// Port Profiles
+export const portProfilesApi = {
+  list: () =>
+    apiClient.get<PortProfile[]>('/port-profiles/'),
+  get: (id: number) =>
+    apiClient.get<PortProfile>(`/port-profiles/${id}/`),
+  create: (data: Partial<PortProfile>) =>
+    apiClient.post<PortProfile>('/port-profiles/', data),
+  update: (id: number, data: Partial<PortProfile>) =>
+    apiClient.patch<PortProfile>(`/port-profiles/${id}/`, data),
+  delete: (id: number) =>
+    apiClient.delete(`/port-profiles/${id}/`),
+  // Nested entries (port templates)
+  entries: {
+    list: (profileId: number) =>
+      apiClient.get<PortTemplate[]>(`/port-profiles/${profileId}/entries/`),
+    create: (profileId: number, data: Partial<PortTemplate>) =>
+      apiClient.post<PortTemplate>(`/port-profiles/${profileId}/entries/`, data),
+    delete: (profileId: number, id: number) =>
+      apiClient.delete(`/port-profiles/${profileId}/entries/${id}/`),
+    bulkCreate: (profileId: number, templates: Array<{ name: string; port_type: string }>) =>
+      apiClient.post<PortTemplate[]>(`/port-profiles/${profileId}/entries/bulk-create/`, { templates }),
+  },
 }
 
 // Device Ports

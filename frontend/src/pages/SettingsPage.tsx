@@ -1,18 +1,76 @@
 import { useState, useRef } from 'react'
 import { Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { backupApi, deviceTypesApi, portTemplatesApi, usersApi, authApi } from '@/api/endpoints'
+import { backupApi, deviceTypesApi, portProfilesApi, usersApi, authApi } from '@/api/endpoints'
 import { extractApiError } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/ui/Dialog'
 import { UserForm } from '@/components/data/forms/UserForm'
 import {
-  Settings, HardDrive, Users, Database, Download, Upload,
-  AlertTriangle, Trash2, Plus, Pencil, ChevronDown, ChevronRight, Zap, Dices,
+  Settings, HardDrive, Users, Database, Download, Upload, Cpu,
+  AlertTriangle, Trash2, Plus, Pencil, ChevronDown, ChevronRight, Dices, List,
 } from 'lucide-react'
-import type { DeviceTypeOption, PortTemplate, UserAdmin } from '@/types'
+import type { DeviceTypeOption, PortProfile, PortTemplate, UserAdmin } from '@/types'
 
 const PORT_TYPE_OPTIONS = ['rj45', 'sfp', 'sfp+', 'qsfp28', 'console'] as const
+
+const PRESET_COLORS = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#22c55e', // green
+  '#f59e0b', // amber
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#f97316', // orange
+  '#14b8a6', // teal
+  '#6366f1', // indigo
+  '#a855f7', // purple
+  '#64748b', // slate
+] as const
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+  const customRef = useRef<HTMLInputElement>(null)
+  const isPreset = (PRESET_COLORS as readonly string[]).includes(value)
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {PRESET_COLORS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(c)}
+          className="w-5 h-5 rounded-sm border-2 transition-transform hover:scale-110"
+          style={{
+            backgroundColor: c,
+            borderColor: value === c ? 'var(--foreground)' : 'transparent',
+          }}
+          title={c}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={() => customRef.current?.click()}
+        className="relative w-5 h-5 rounded-sm border-2 transition-transform hover:scale-110 overflow-hidden"
+        style={{
+          background: isPreset
+            ? 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)'
+            : value,
+          borderColor: !isPreset ? 'var(--foreground)' : 'transparent',
+        }}
+        title="Custom color"
+      >
+        <input
+          ref={customRef}
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 opacity-0 cursor-pointer"
+        />
+      </button>
+    </div>
+  )
+}
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return `flex items-center gap-2 rounded-md px-3 py-1.5 text-sm ${
@@ -34,6 +92,9 @@ export function SettingsPage() {
         <NavLink to="/settings/device-types" className={navLinkClass}>
           <HardDrive className="h-4 w-4" /> Device Types
         </NavLink>
+        <NavLink to="/settings/port-profiles" className={navLinkClass}>
+          <Cpu className="h-4 w-4" /> Port Profiles
+        </NavLink>
         <NavLink to="/settings/users" className={navLinkClass}>
           <Users className="h-4 w-4" /> Users
         </NavLink>
@@ -47,6 +108,7 @@ export function SettingsPage() {
           <Route index element={<Navigate to="device-types" replace />} />
           <Route path="general" element={<GeneralSection />} />
           <Route path="device-types" element={<DeviceTypesSection />} />
+          <Route path="port-profiles" element={<PortProfilesSection />} />
           <Route path="users" element={<UsersSection />} />
           <Route path="backup" element={<BackupSection />} />
         </Routes>
@@ -342,9 +404,11 @@ function DeviceTypesSection() {
   const queryClient = useQueryClient()
   const [newValue, setNewValue] = useState('')
   const [newLabel, setNewLabel] = useState('')
+  const [newColor, setNewColor] = useState('#3b82f6')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editLabel, setEditLabel] = useState('')
-  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [editColor, setEditColor] = useState('#3b82f6')
+  const [showNewColorPicker, setShowNewColorPicker] = useState(false)
 
   const { data: deviceTypes } = useQuery({
     queryKey: ['device-types'],
@@ -358,6 +422,8 @@ function DeviceTypesSection() {
       queryClient.invalidateQueries({ queryKey: ['device-types'] })
       setNewValue('')
       setNewLabel('')
+      setNewColor('#3b82f6')
+      setShowNewColorPicker(false)
       toast.success('Device type added')
     },
     onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to add device type')),
@@ -389,6 +455,7 @@ function DeviceTypesSection() {
     createMutation.mutate({
       value: newValue.trim(),
       label: newLabel.trim(),
+      color: newColor,
       position: (deviceTypes?.length ?? 0),
     })
   }
@@ -396,15 +463,12 @@ function DeviceTypesSection() {
   const startEdit = (dt: DeviceTypeOption) => {
     setEditingId(dt.id)
     setEditLabel(dt.label)
+    setEditColor(dt.color)
   }
 
   const saveEdit = (id: number) => {
     if (!editLabel.trim()) return
-    updateMutation.mutate({ id, data: { label: editLabel.trim() } })
-  }
-
-  const toggleExpand = (id: number) => {
-    setExpandedId(expandedId === id ? null : id)
+    updateMutation.mutate({ id, data: { label: editLabel.trim(), color: editColor } })
   }
 
   return (
@@ -418,9 +482,9 @@ function DeviceTypesSection() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-muted/50">
-              <th className="px-3 py-1.5 w-8" />
               <th className="px-3 py-1.5 text-left font-medium">Value</th>
               <th className="px-3 py-1.5 text-left font-medium">Label</th>
+              <th className="px-3 py-1.5 text-left font-medium w-16">Color</th>
               <th className="px-3 py-1.5 w-20" />
             </tr>
           </thead>
@@ -431,9 +495,9 @@ function DeviceTypesSection() {
                 dt={dt}
                 editingId={editingId}
                 editLabel={editLabel}
-                expanded={expandedId === dt.id}
-                onToggleExpand={() => toggleExpand(dt.id)}
+                editColor={editColor}
                 onEditLabel={setEditLabel}
+                onEditColor={setEditColor}
                 onStartEdit={() => startEdit(dt)}
                 onSaveEdit={() => saveEdit(dt.id)}
                 onCancelEdit={() => setEditingId(null)}
@@ -444,33 +508,45 @@ function DeviceTypesSection() {
         </table>
       </div>
 
-      <form onSubmit={handleAdd} className="flex items-end gap-2">
-        <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Value</label>
-          <input
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-            placeholder="e.g. ups"
-            className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs font-mono"
+      <form onSubmit={handleAdd} className="space-y-2">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">Value</label>
+            <input
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              placeholder="e.g. ups"
+              className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs font-mono"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-[10px] text-muted-foreground">Label</label>
+            <input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="e.g. UPS"
+              className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowNewColorPicker(!showNewColorPicker)}
+            className="w-7 h-7 rounded-md border border-input shrink-0"
+            style={{ backgroundColor: newColor }}
+            title="Choose color"
           />
+          <button
+            type="submit"
+            disabled={createMutation.isPending || !newValue.trim() || !newLabel.trim()}
+            className="flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add
+          </button>
         </div>
-        <div className="flex-1">
-          <label className="text-[10px] text-muted-foreground">Label</label>
-          <input
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
-            placeholder="e.g. UPS"
-            className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={createMutation.isPending || !newValue.trim() || !newLabel.trim()}
-          className="flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add
-        </button>
+        {showNewColorPicker && (
+          <ColorPicker value={newColor} onChange={setNewColor} />
+        )}
       </form>
     </div>
   )
@@ -482,9 +558,9 @@ interface DeviceTypeRowProps {
   dt: DeviceTypeOption
   editingId: number | null
   editLabel: string
-  expanded: boolean
-  onToggleExpand: () => void
+  editColor: string
   onEditLabel: (v: string) => void
+  onEditColor: (v: string) => void
   onStartEdit: () => void
   onSaveEdit: () => void
   onCancelEdit: () => void
@@ -492,30 +568,19 @@ interface DeviceTypeRowProps {
 }
 
 function DeviceTypeRow({
-  dt, editingId, editLabel, expanded,
-  onToggleExpand, onEditLabel, onStartEdit, onSaveEdit, onCancelEdit, onDelete,
+  dt, editingId, editLabel, editColor,
+  onEditLabel, onEditColor, onStartEdit, onSaveEdit, onCancelEdit, onDelete,
 }: DeviceTypeRowProps) {
+  const isEditing = editingId === dt.id
   return (
     <>
-      <tr className="border-b border-border last:border-0">
-        <td className="px-3 py-1.5">
-          <button
-            onClick={onToggleExpand}
-            className="p-0.5 rounded hover:bg-accent"
-            title="Toggle port templates"
-          >
-            {expanded
-              ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-          </button>
-        </td>
+      <tr className={isEditing ? 'bg-accent/20' : 'border-b border-border last:border-0'}>
         <td className="px-3 py-1.5 font-mono text-muted-foreground">{dt.value}</td>
         <td className="px-3 py-1.5">
-          {editingId === dt.id ? (
+          {isEditing ? (
             <input
               value={editLabel}
               onChange={(e) => onEditLabel(e.target.value)}
-              onBlur={onSaveEdit}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onSaveEdit()
                 if (e.key === 'Escape') onCancelEdit()
@@ -530,20 +595,38 @@ function DeviceTypeRow({
           )}
         </td>
         <td className="px-3 py-1.5">
-          <div className="flex gap-0.5 justify-end">
-            <button onClick={onStartEdit} className="p-0.5 rounded hover:bg-accent" title="Edit label">
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-            <button onClick={onDelete} className="p-0.5 rounded hover:bg-destructive/20" title="Delete device type">
-              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-          </div>
+          <div
+            className="w-5 h-5 rounded border border-border/50"
+            style={{ backgroundColor: isEditing ? editColor : dt.color }}
+            title={isEditing ? editColor : dt.color}
+          />
+        </td>
+        <td className="px-3 py-1.5">
+          {isEditing ? (
+            <div className="flex gap-0.5 justify-end">
+              <button onClick={onSaveEdit} className="rounded bg-primary px-2 py-0.5 text-[10px] text-primary-foreground hover:bg-primary/90">
+                Save
+              </button>
+              <button onClick={onCancelEdit} className="rounded border border-border px-2 py-0.5 text-[10px] hover:bg-accent">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-0.5 justify-end">
+              <button onClick={onStartEdit} className="p-0.5 rounded hover:bg-accent" title="Edit">
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              <button onClick={onDelete} className="p-0.5 rounded hover:bg-destructive/20" title="Delete device type">
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </div>
+          )}
         </td>
       </tr>
-      {expanded && (
-        <tr>
-          <td colSpan={4} className="bg-muted/30 px-4 py-3">
-            <PortTemplatesPanel deviceTypeId={dt.id} />
+      {isEditing && (
+        <tr className="border-b border-border bg-accent/20">
+          <td colSpan={4} className="px-3 py-2">
+            <ColorPicker value={editColor} onChange={onEditColor} />
           </td>
         </tr>
       )}
@@ -551,50 +634,254 @@ function DeviceTypeRow({
   )
 }
 
-// ─── Port Templates Panel ───────────────────────────────────────────────────
+// ─── Port Profiles Section ──────────────────────────────────────────────────
 
-function PortTemplatesPanel({ deviceTypeId }: { deviceTypeId: number }) {
+function generateSeriesFromPattern(
+  pattern: string,
+  start: number,
+  end: number,
+  step: number,
+): string[] {
+  const match = pattern.match(/\{(N+)\}/)
+  if (!match) return []
+  const padLen = match[1].length
+  const results: string[] = []
+  for (let i = start; i <= end; i += step) {
+    const num = padLen > 1 ? String(i).padStart(padLen, '0') : String(i)
+    results.push(pattern.replace(match[0], num))
+  }
+  return results
+}
+
+function PortProfilesSection() {
   const queryClient = useQueryClient()
   const [newName, setNewName] = useState('')
-  const [newPortType, setNewPortType] = useState<string>('rj45')
-  const [newPosition, setNewPosition] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [expandedId, setExpandedId] = useState<number | null>(null)
 
-  const { data: templates, isLoading } = useQuery({
-    queryKey: ['port-templates', deviceTypeId],
-    queryFn: () => portTemplatesApi.list(deviceTypeId),
+  const { data: profiles } = useQuery({
+    queryKey: ['port-profiles'],
+    queryFn: () => portProfilesApi.list(),
     select: (res) => res.data,
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: Partial<PortTemplate>) => portTemplatesApi.create(deviceTypeId, data),
+    mutationFn: (data: Partial<PortProfile>) => portProfilesApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['port-templates', deviceTypeId] })
+      queryClient.invalidateQueries({ queryKey: ['port-profiles'] })
       setNewName('')
-      setNewPosition('')
-      toast.success('Port template added')
+      setNewDesc('')
+      toast.success('Port profile created')
     },
-    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to add template')),
+    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to create profile')),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<PortProfile> }) =>
+      portProfilesApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['port-profiles'] })
+      setEditingId(null)
+      toast.success('Profile updated')
+    },
+    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to update')),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => portTemplatesApi.delete(deviceTypeId, id),
+    mutationFn: (id: number) => portProfilesApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['port-templates', deviceTypeId] })
-      toast.success('Port template deleted')
+      queryClient.invalidateQueries({ queryKey: ['port-profiles'] })
+      toast.success('Profile deleted')
     },
-    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to delete template')),
-  })
-
-  const applyMutation = useMutation({
-    mutationFn: () => portTemplatesApi.apply(deviceTypeId),
-    onSuccess: (res) => toast.success(res.data.detail),
-    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to apply templates')),
+    onError: (err: unknown) => toast.error(extractApiError(err, 'Cannot delete profile')),
   })
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newName.trim()) return
-    const pos = newPosition ? parseInt(newPosition, 10) : (templates?.length ?? 0) + 1
+    createMutation.mutate({ name: newName.trim(), description: newDesc.trim() })
+  }
+
+  const startEdit = (p: PortProfile) => {
+    setEditingId(p.id)
+    setEditName(p.name)
+    setEditDesc(p.description)
+  }
+
+  const saveEdit = (id: number) => {
+    if (!editName.trim()) return
+    updateMutation.mutate({ id, data: { name: editName.trim(), description: editDesc.trim() } })
+  }
+
+  return (
+    <div className="max-w-3xl space-y-3">
+      <h2 className="text-sm font-semibold">Port Profiles</h2>
+      <p className="text-xs text-muted-foreground">
+        Define reusable port profiles that can be applied to any host.
+      </p>
+
+      <div className="space-y-2">
+        {profiles?.map((profile) => (
+          <div key={profile.id} className="rounded-md border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
+              <button
+                onClick={() => setExpandedId(expandedId === profile.id ? null : profile.id)}
+                className="flex items-center gap-2 text-sm font-medium"
+              >
+                {expandedId === profile.id
+                  ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                {editingId === profile.id ? (
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onBlur={() => saveEdit(profile.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveEdit(profile.id)
+                      if (e.key === 'Escape') setEditingId(null)
+                    }}
+                    autoFocus
+                    className="rounded border border-input bg-background px-2 py-0.5 text-xs"
+                  />
+                ) : (
+                  profile.name
+                )}
+                <span className="text-xs font-normal text-muted-foreground">
+                  ({profile.entry_count} ports)
+                </span>
+              </button>
+              <div className="flex gap-0.5">
+                <button onClick={() => startEdit(profile)} className="p-0.5 rounded hover:bg-accent" title="Edit">
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Delete profile "${profile.name}"?`)) deleteMutation.mutate(profile.id)
+                  }}
+                  className="p-0.5 rounded hover:bg-destructive/20"
+                  title="Delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+            {expandedId === profile.id && (
+              <div className="px-3 py-3 border-t border-border">
+                <PortEntriesPanel profileId={profile.id} />
+              </div>
+            )}
+          </div>
+        ))}
+        {profiles?.length === 0 && (
+          <p className="text-xs text-muted-foreground italic">No port profiles defined.</p>
+        )}
+      </div>
+
+      <form onSubmit={handleAdd} className="flex items-end gap-2">
+        <div className="flex-1">
+          <label className="text-[10px] text-muted-foreground">Name</label>
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="e.g. Mikrotik CRS328"
+            className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] text-muted-foreground">Description</label>
+          <input
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.target.value)}
+            placeholder="optional"
+            className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={createMutation.isPending || !newName.trim()}
+          className="flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add Profile
+        </button>
+      </form>
+    </div>
+  )
+}
+
+// ─── Port Entries Panel (inside a profile) ──────────────────────────────────
+
+function PortEntriesPanel({ profileId }: { profileId: number }) {
+  const queryClient = useQueryClient()
+  const [newName, setNewName] = useState('')
+  const [newPortType, setNewPortType] = useState<string>('rj45')
+  const [newPosition, setNewPosition] = useState('')
+
+  const [showGenerator, setShowGenerator] = useState(false)
+  const [genPattern, setGenPattern] = useState('')
+  const [genPortType, setGenPortType] = useState('rj45')
+  const [genStart, setGenStart] = useState('1')
+  const [genEnd, setGenEnd] = useState('24')
+  const [genStep, setGenStep] = useState('1')
+
+  const { data: entries, isLoading } = useQuery({
+    queryKey: ['port-entries', profileId],
+    queryFn: () => portProfilesApi.entries.list(profileId),
+    select: (res) => res.data,
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (data: Partial<PortTemplate>) => portProfilesApi.entries.create(profileId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['port-entries', profileId] })
+      queryClient.invalidateQueries({ queryKey: ['port-profiles'] })
+      setNewName('')
+      setNewPosition('')
+      toast.success('Port entry added')
+    },
+    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to add entry')),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => portProfilesApi.entries.delete(profileId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['port-entries', profileId] })
+      queryClient.invalidateQueries({ queryKey: ['port-profiles'] })
+      toast.success('Port entry deleted')
+    },
+    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to delete entry')),
+  })
+
+  const bulkMutation = useMutation({
+    mutationFn: (tpls: Array<{ name: string; port_type: string }>) =>
+      portProfilesApi.entries.bulkCreate(profileId, tpls),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['port-entries', profileId] })
+      queryClient.invalidateQueries({ queryKey: ['port-profiles'] })
+      setShowGenerator(false)
+      setGenPattern('')
+      toast.success(`Added ${res.data.length} port entries`)
+    },
+    onError: (err: unknown) => toast.error(extractApiError(err, 'Failed to create entries')),
+  })
+
+  const preview = genPattern.match(/\{N+\}/)
+    ? generateSeriesFromPattern(
+        genPattern,
+        parseInt(genStart) || 0,
+        parseInt(genEnd) || 0,
+        Math.max(1, parseInt(genStep) || 1),
+      )
+    : []
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newName.trim()) return
+    const pos = newPosition ? parseInt(newPosition, 10) : (entries?.length ?? 0) + 1
     createMutation.mutate({
       name: newName.trim(),
       port_type: newPortType,
@@ -604,11 +891,9 @@ function PortTemplatesPanel({ deviceTypeId }: { deviceTypeId: number }) {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-medium text-muted-foreground">Port Templates</h3>
-
       {isLoading ? (
         <p className="text-xs text-muted-foreground">Loading...</p>
-      ) : templates && templates.length > 0 ? (
+      ) : entries && entries.length > 0 ? (
         <div className="rounded-md border border-border overflow-hidden bg-background">
           <table className="w-full text-xs">
             <thead>
@@ -620,7 +905,7 @@ function PortTemplatesPanel({ deviceTypeId }: { deviceTypeId: number }) {
               </tr>
             </thead>
             <tbody>
-              {templates.map((t) => (
+              {entries.map((t) => (
                 <tr key={t.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-1 font-mono">{t.name}</td>
                   <td className="px-3 py-1 text-muted-foreground">{t.port_type}</td>
@@ -629,7 +914,7 @@ function PortTemplatesPanel({ deviceTypeId }: { deviceTypeId: number }) {
                     <button
                       onClick={() => deleteMutation.mutate(t.id)}
                       className="p-0.5 rounded hover:bg-destructive/20"
-                      title="Delete template"
+                      title="Delete entry"
                     >
                       <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
@@ -640,7 +925,7 @@ function PortTemplatesPanel({ deviceTypeId }: { deviceTypeId: number }) {
           </table>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground italic">No port templates defined.</p>
+        <p className="text-xs text-muted-foreground italic">No port entries defined.</p>
       )}
 
       <form onSubmit={handleAdd} className="flex items-end gap-2">
@@ -684,14 +969,100 @@ function PortTemplatesPanel({ deviceTypeId }: { deviceTypeId: number }) {
         </button>
       </form>
 
-      <button
-        onClick={() => applyMutation.mutate()}
-        disabled={applyMutation.isPending || !templates?.length}
-        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-xs hover:bg-accent disabled:opacity-50"
-      >
-        <Zap className="h-3.5 w-3.5" />
-        {applyMutation.isPending ? 'Applying...' : 'Apply to existing hosts'}
-      </button>
+      {!showGenerator ? (
+        <button
+          onClick={() => setShowGenerator(true)}
+          className="flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-1 text-xs hover:bg-accent"
+        >
+          <List className="h-3.5 w-3.5" />
+          Generate series
+        </button>
+      ) : (
+        <div className="rounded-md border border-border p-3 space-y-2 bg-muted/30">
+          <h4 className="text-xs font-medium">Generate Port Series</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="col-span-2">
+              <label className="text-[10px] text-muted-foreground">{'Pattern (use {N}, {NN}, {NNN})'}</label>
+              <input
+                value={genPattern}
+                onChange={(e) => setGenPattern(e.target.value)}
+                placeholder="e.g. ether{N}"
+                className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">Type</label>
+              <select
+                value={genPortType}
+                onChange={(e) => setGenPortType(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+              >
+                {PORT_TYPE_OPTIONS.map((pt) => (
+                  <option key={pt} value={pt}>{pt}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              <div>
+                <label className="text-[10px] text-muted-foreground">Start</label>
+                <input
+                  value={genStart}
+                  onChange={(e) => setGenStart(e.target.value.replace(/\D/g, ''))}
+                  className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">End</label>
+                <input
+                  value={genEnd}
+                  onChange={(e) => setGenEnd(e.target.value.replace(/\D/g, ''))}
+                  className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">Step</label>
+                <input
+                  value={genStep}
+                  onChange={(e) => setGenStep(e.target.value.replace(/\D/g, ''))}
+                  className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          {preview.length > 0 && (
+            <div className="text-[10px] text-muted-foreground">
+              <span className="font-medium">Preview ({preview.length}):</span>{' '}
+              {preview.length <= 10
+                ? preview.join(', ')
+                : `${preview.slice(0, 5).join(', ')}, ... ${preview.slice(-3).join(', ')}`}
+            </div>
+          )}
+
+          {preview.length > 200 && (
+            <p className="text-[10px] text-red-500">Maximum 200 ports per series.</p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowGenerator(false)}
+              className="rounded-md border border-border px-3 py-1 text-xs hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (preview.length === 0 || preview.length > 200) return
+                bulkMutation.mutate(preview.map((name) => ({ name, port_type: genPortType })))
+              }}
+              disabled={preview.length === 0 || preview.length > 200 || bulkMutation.isPending}
+              className="flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {bulkMutation.isPending ? 'Adding...' : `Add ${preview.length} ports`}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import ipaddress
 
-from django.db.models import Count, Prefetch, Q
+from django.db import transaction
+from django.db.models import Count, Max, Prefetch, Q
 from django.db.models.expressions import RawSQL
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
@@ -11,11 +12,11 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
 from .filters import HostFilter, SubnetFilter, TunnelFilter, VLANFilter, DHCPPoolFilter, DevicePortFilter, CableFilter, PatchPanelFilter
-from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType, PortTemplate, DevicePort, PatchPanel, Cable
+from .models import VLAN, Host, Subnet, Tunnel, DHCPPool, DeviceType, PortProfile, PortTemplate, DevicePort, PatchPanel, Cable
 from .permissions import IsAdmin, ProjectPermission
 from .serializers import (
     HostSerializer, SubnetSerializer, TunnelSerializer, VLANSerializer,
-    DHCPPoolSerializer, DeviceTypeSerializer,
+    DHCPPoolSerializer, DeviceTypeSerializer, PortProfileSerializer,
     PortTemplateSerializer, DevicePortSerializer, PatchPanelSerializer, CableSerializer,
     PhysicalHostSerializer, PhysicalPatchPanelSerializer, PhysicalCableSerializer,
 )
@@ -228,6 +229,39 @@ class HostViewSet(viewsets.ModelViewSet):
             "subnet", "subnet__project", "subnet__site", "subnet__vlan"
         )
 
+    @action(detail=True, methods=["post"], url_path="apply-port-profile")
+    def apply_port_profile(self, request, pk=None):
+        """Apply port entries from a port profile to this host."""
+        host = self.get_object()
+        profile_id = request.data.get("profile_id")
+        if not profile_id:
+            return Response(
+                {"detail": "profile_id is required.", "created": 0},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            profile = PortProfile.objects.get(pk=profile_id)
+        except PortProfile.DoesNotExist:
+            return Response(
+                {"detail": f"Port profile not found.", "created": 0},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        entries = profile.entries.all()
+        if not entries.exists():
+            return Response(
+                {"detail": "No entries defined in this profile.", "created": 0},
+            )
+        created = 0
+        with transaction.atomic():
+            for entry in entries:
+                _, was_created = DevicePort.objects.get_or_create(
+                    host=host, name=entry.name,
+                    defaults={"port_type": entry.port_type, "position": entry.position},
+                )
+                if was_created:
+                    created += 1
+        return Response({"detail": f"Created {created} port(s) from profile.", "created": created})
+
 
 class DHCPPoolViewSet(viewsets.ModelViewSet):
     serializer_class = DHCPPoolSerializer
@@ -263,6 +297,19 @@ class TunnelViewSet(viewsets.ModelViewSet):
         return qs
 
 
+class PortProfileViewSet(viewsets.ModelViewSet):
+    serializer_class = PortProfileSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdmin()]
+
+    def get_queryset(self):
+        return PortProfile.objects.annotate(entry_count=Count("entries"))
+
+
 class PortTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = PortTemplateSerializer
     pagination_class = None
@@ -273,27 +320,56 @@ class PortTemplateViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated(), IsAdmin()]
 
     def get_queryset(self):
-        return PortTemplate.objects.filter(device_type_id=self.kwargs["device_type_pk"])
+        return PortTemplate.objects.filter(profile_id=self.kwargs["profile_pk"])
 
     def perform_create(self, serializer):
-        serializer.save(device_type_id=self.kwargs["device_type_pk"])
+        serializer.save(profile_id=self.kwargs["profile_pk"])
 
-    @action(detail=False, methods=["post"])
-    def apply(self, request, device_type_pk=None):
-        """Sync port templates to all existing hosts of this device type."""
-        dt = get_object_or_404(DeviceType, pk=device_type_pk)
-        templates = dt.port_templates.all()
-        hosts = Host.objects.filter(device_type=dt.value)
-        created = 0
-        for host in hosts:
-            for tpl in templates:
-                _, was_created = DevicePort.objects.get_or_create(
-                    host=host, name=tpl.name,
-                    defaults={"port_type": tpl.port_type, "position": tpl.position},
+    @action(detail=False, methods=["post"], url_path="bulk-create")
+    def bulk_create(self, request, profile_pk=None):
+        """Create multiple port entries at once."""
+        profile = get_object_or_404(PortProfile, pk=profile_pk)
+        templates_data = request.data.get("templates", [])
+        if not isinstance(templates_data, list) or len(templates_data) == 0:
+            return Response(
+                {"detail": "Provide a non-empty 'templates' list."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(templates_data) > 200:
+            return Response(
+                {"detail": "Maximum 200 entries per request."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        names = [t.get("name", "").strip() for t in templates_data]
+        if len(names) != len(set(names)):
+            return Response(
+                {"detail": "Duplicate names in request."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        existing = set(profile.entries.values_list("name", flat=True))
+        conflicts = [n for n in names if n in existing]
+        if conflicts:
+            return Response(
+                {"detail": f"Names already exist: {', '.join(conflicts[:10])}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        max_pos = profile.entries.aggregate(m=Max("position"))["m"] or 0
+        created = []
+        with transaction.atomic():
+            for i, tpl_data in enumerate(templates_data, start=1):
+                name = tpl_data.get("name", "").strip()
+                port_type = tpl_data.get("port_type", "rj45")
+                if not name:
+                    continue
+                obj = PortTemplate.objects.create(
+                    profile=profile,
+                    name=name,
+                    port_type=port_type,
+                    position=max_pos + i,
                 )
-                if was_created:
-                    created += 1
-        return Response({"detail": f"Created {created} port(s) across {hosts.count()} host(s)."})
+                created.append(obj)
+        serializer = self.get_serializer(created, many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class DevicePortViewSet(viewsets.ModelViewSet):
