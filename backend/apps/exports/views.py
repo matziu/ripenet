@@ -1,11 +1,84 @@
 import io
+import json
+import tempfile
+from datetime import date
 
+from django.core.management import call_command
 from django.http import HttpResponse
+from rest_framework import status
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.ipam.models import VLAN, Host, Subnet, Tunnel
 from apps.projects.models import Project, Site
+
+
+class IsAdmin(IsAuthenticated):
+    def has_permission(self, request, view):
+        return super().has_permission(request, view) and getattr(request.user, "is_admin", False)
+
+
+class DataExportView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        output = io.StringIO()
+        call_command(
+            "dumpdata",
+            "projects", "ipam", "accounts", "audit",
+            format="json",
+            indent=2,
+            stdout=output,
+        )
+        content = output.getvalue()
+        response = HttpResponse(content, content_type="application/json")
+        response["Content-Disposition"] = f'attachment; filename="ripenet-backup-{date.today()}.json"'
+        return response
+
+
+class DataImportView(APIView):
+    permission_classes = [IsAdmin]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            content = uploaded.read().decode("utf-8")
+            data = json.loads(content)
+            if not isinstance(data, list):
+                raise ValueError("Expected a JSON array")
+        except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as e:
+            return Response({"detail": f"Invalid JSON file: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate that all entries have model field from allowed apps
+        allowed_apps = {"projects.", "ipam.", "accounts.", "audit."}
+        for entry in data:
+            model = entry.get("model", "")
+            if not any(model.startswith(app) for app in allowed_apps):
+                return Response(
+                    {"detail": f"Unexpected model '{model}'. Only projects, ipam, accounts, audit data allowed."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        replace = request.query_params.get("replace") == "true"
+
+        if replace:
+            call_command("flush", "--no-input")
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=True) as f:
+            f.write(content)
+            f.flush()
+            try:
+                call_command("loaddata", f.name)
+            except Exception as e:
+                return Response({"detail": f"Import failed: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"detail": f"Imported {len(data)} objects.", "count": len(data)})
 
 
 class ProjectExcelView(APIView):

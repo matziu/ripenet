@@ -161,3 +161,17 @@ export const exportApi = {
   pdf: (projectId: number) =>
     apiClient.get(`/exports/project/${projectId}/pdf/`, { responseType: 'blob' }),
 }
+
+// Backup
+export const backupApi = {
+  download: () =>
+    apiClient.get('/backup/export/', { responseType: 'blob' }),
+  upload: (file: File, replace: boolean) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiClient.post<{ detail: string; count: number }>(
+      `/backup/import/${replace ? '?replace=true' : ''}`,
+      form,
+    )
+  },
+}

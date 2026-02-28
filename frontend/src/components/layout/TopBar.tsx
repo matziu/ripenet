@@ -5,7 +5,7 @@ import { authApi } from '@/api/endpoints'
 import { cn } from '@/lib/utils'
 import {
   Search, Moon, Sun, PanelLeftClose, PanelLeft,
-  Network, Map, Table, Users,
+  Network, Map, Table, Users, Settings,
 } from 'lucide-react'
 
 export function TopBar() {
@@ -98,13 +98,22 @@ export function TopBar() {
         )}
 
         {me?.role === 'admin' && (
-          <button
-            onClick={() => navigate('/users')}
-            className="p-1.5 rounded-md hover:bg-accent"
-            title="Manage Users"
-          >
-            <Users className="h-4 w-4" />
-          </button>
+          <>
+            <button
+              onClick={() => navigate('/users')}
+              className="p-1.5 rounded-md hover:bg-accent"
+              title="Manage Users"
+            >
+              <Users className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className="p-1.5 rounded-md hover:bg-accent"
+              title="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          </>
         )}
 
         <button onClick={toggleDarkMode} className="p-1.5 rounded-md hover:bg-accent" title="Toggle dark mode">
