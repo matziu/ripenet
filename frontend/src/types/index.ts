@@ -206,6 +206,79 @@ export interface ProjectTopology {
   tunnels: TunnelTopology[]
 }
 
+// Physical topology types (L1)
+export interface PortTemplate {
+  id: number
+  device_type: number
+  name: string
+  port_type: string
+  position: number
+}
+
+export interface DevicePort {
+  id: number
+  host: number | null
+  patch_panel: number | null
+  name: string
+  port_type: string
+  position: number
+  description: string
+  cable: { id: number; cable_type: string; label: string } | null
+}
+
+export interface PatchPanel {
+  id: number
+  site: number
+  name: string
+  port_count: number
+  description: string
+  port_count_current: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Cable {
+  id: number
+  port_a: number
+  port_b: number
+  cable_type: string
+  label: string
+  port_a_display: string
+  port_b_display: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PhysicalTopology {
+  hosts: PhysicalHost[]
+  patch_panels: PhysicalPatchPanel[]
+  cables: PhysicalCable[]
+}
+
+export interface PhysicalHost {
+  id: number
+  ip_address: string
+  hostname: string
+  device_type: string
+  ports: { id: number; name: string; port_type: string; position: number }[]
+}
+
+export interface PhysicalPatchPanel {
+  id: number
+  name: string
+  ports: { id: number; name: string; port_type: string; position: number }[]
+}
+
+export interface PhysicalCable {
+  id: number
+  port_a: number
+  port_b: number
+  cable_type: string
+  label: string
+  port_a_device: { type: string; id: number; name: string; site_id: number } | null
+  port_b_device: { type: string; id: number; name: string; site_id: number } | null
+}
+
 // Search
 export interface SearchResult {
   type: 'host' | 'subnet' | 'vlan' | 'site' | 'project'

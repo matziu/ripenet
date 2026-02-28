@@ -1,6 +1,7 @@
 import type {
   Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool, DeviceTypeOption,
   ProjectTopology, SearchResult, PaginatedResponse, AuditLog, User, UserAdmin,
+  PortTemplate, DevicePort, PatchPanel, Cable, PhysicalTopology,
 } from '@/types'
 import apiClient from './client'
 
@@ -140,6 +141,66 @@ export const usersApi = {
     apiClient.patch<UserAdmin>(`/users/${id}/`, data),
   delete: (id: number) =>
     apiClient.delete(`/users/${id}/`),
+}
+
+// Port Templates (nested under device-types)
+export const portTemplatesApi = {
+  list: (deviceTypeId: number) =>
+    apiClient.get<PortTemplate[]>(`/device-types/${deviceTypeId}/port-templates/`),
+  create: (deviceTypeId: number, data: Partial<PortTemplate>) =>
+    apiClient.post<PortTemplate>(`/device-types/${deviceTypeId}/port-templates/`, data),
+  update: (deviceTypeId: number, id: number, data: Partial<PortTemplate>) =>
+    apiClient.patch<PortTemplate>(`/device-types/${deviceTypeId}/port-templates/${id}/`, data),
+  delete: (deviceTypeId: number, id: number) =>
+    apiClient.delete(`/device-types/${deviceTypeId}/port-templates/${id}/`),
+  apply: (deviceTypeId: number) =>
+    apiClient.post<{ detail: string }>(`/device-types/${deviceTypeId}/port-templates/apply/`),
+}
+
+// Device Ports
+export const portsApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<DevicePort[]>('/ports/', { params }),
+  create: (data: Partial<DevicePort>) =>
+    apiClient.post<DevicePort>('/ports/', data),
+  update: (id: number, data: Partial<DevicePort>) =>
+    apiClient.patch<DevicePort>(`/ports/${id}/`, data),
+  delete: (id: number) =>
+    apiClient.delete(`/ports/${id}/`),
+}
+
+// Patch Panels
+export const patchPanelsApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<PaginatedResponse<PatchPanel>>('/patch-panels/', { params }),
+  get: (id: number) =>
+    apiClient.get<PatchPanel>(`/patch-panels/${id}/`),
+  create: (data: Partial<PatchPanel>) =>
+    apiClient.post<PatchPanel>('/patch-panels/', data),
+  update: (id: number, data: Partial<PatchPanel>) =>
+    apiClient.patch<PatchPanel>(`/patch-panels/${id}/`, data),
+  delete: (id: number) =>
+    apiClient.delete(`/patch-panels/${id}/`),
+}
+
+// Cables
+export const cablesApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<PaginatedResponse<Cable>>('/cables/', { params }),
+  get: (id: number) =>
+    apiClient.get<Cable>(`/cables/${id}/`),
+  create: (data: Partial<Cable>) =>
+    apiClient.post<Cable>('/cables/', data),
+  update: (id: number, data: Partial<Cable>) =>
+    apiClient.patch<Cable>(`/cables/${id}/`, data),
+  delete: (id: number) =>
+    apiClient.delete(`/cables/${id}/`),
+}
+
+// Physical Topology
+export const physicalTopologyApi = {
+  get: (siteId: number) =>
+    apiClient.get<PhysicalTopology>(`/sites/${siteId}/physical-topology/`),
 }
 
 // Search
