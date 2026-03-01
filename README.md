@@ -11,6 +11,9 @@ Web application for managing IP address infrastructure: projects, sites, VLANs, 
 ## Features
 
 - Hierarchical network management: Project > Site > VLAN > Subnet > Host
+- Physical topology (L1) — device ports, patch panels, cables with type-based color coding
+- Dual-sided patch panel ports — each PP port supports front/back cables with position-based routing
+- Per-port cable side locking — prevent auto-switching during drag
 - DHCP pool management with lease tracking and utilization monitoring
 - Network tunnels (GRE, IPsec, VXLAN, WireGuard) with cross-project support
 - Interactive topology view (React Flow) with drag-and-drop layout
@@ -41,6 +44,12 @@ Web application for managing IP address infrastructure: projects, sites, VLANs, 
 
 ### Topology view (dark mode)
 ![Topology view dark](docs/screenshots/topology-dark.png)
+
+### Physical topology (L1)
+![Physical topology](docs/screenshots/physical-dark.png)
+
+### Physical topology (light mode)
+![Physical topology light](docs/screenshots/physical-light.png)
 
 ## Quick Start
 
@@ -139,6 +148,11 @@ REST API at `/api/v1/`:
 | `/exports/project/{id}/pdf/` | PDF export |
 | `/exports/project/{id}/excel/` | Excel export |
 | `/users/` | User management (admin only) |
+| `/device-types/` | Device types CRUD |
+| `/patch-panels/` | Patch panels CRUD |
+| `/device-ports/` | Device ports CRUD |
+| `/cables/` | Cables CRUD |
+| `/sites/{id}/physical/` | Physical topology for a site |
 
 ## License
 

@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-03-01
+
+### Added
+- Dual-sided patch panel ports — each PP port supports 2 cables (front/back), reflecting real-world patch panel wiring
+- Position-based cable routing — PP cables automatically connect from the side facing the connected device
+- Live drag update — cable sides and host port direction recompute in real-time while dragging nodes
+- Per-port cable side locking — click the amber dot on a PP port to lock its cable side, preventing auto-switching during drag (persisted per site)
+- PP-to-PP same-panel cable rendering — loopback cables render as visible arcs outside the panel
+- Per-side connection indicators — amber dots on PP ports show independently on left/right side
+
+### Changed
+- Cable model changed from OneToOneField to ForeignKey (port_a, port_b) to support dual-sided PP ports
+- Cable form now shows PP ports as available when cable count < 2 (host ports still limited to 1)
+- Serializer validation enforces per-port cable limits (2 for PP, 1 for host)
+
+### Migration notes
+- Run `docker compose up --build` — migration `0015` changes Cable foreign key constraints
+
+---
+
 ## [1.2.0] - 2026-02-28
 
 ### Added
@@ -101,6 +121,16 @@ Initial release.
 - Docker Compose one-command deployment
 
 ## Upgrading
+
+### From 1.2.x to 1.3.0
+
+```bash
+docker compose down
+git pull origin main
+docker compose up --build
+```
+
+Database migration runs automatically on startup — changes Cable port fields from OneToOneField to ForeignKey.
 
 ### From 1.1.x to 1.2.0
 
