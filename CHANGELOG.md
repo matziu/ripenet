@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-03-01
+
+### Fixed
+- Port list API returning 500 after Cable model migration — `DevicePortSerializer.get_cable()` used `getattr()` on ForeignKey reverse relations (now RelatedManagers), replaced with `.first()` queries
+
+---
+
 ## [1.3.0] - 2026-03-01
 
 ### Added
@@ -121,6 +128,16 @@ Initial release.
 - Docker Compose one-command deployment
 
 ## Upgrading
+
+### From 1.3.0 to 1.3.1
+
+```bash
+docker compose down
+git pull origin main
+docker compose up --build
+```
+
+No database migrations required — serializer-only fix.
 
 ### From 1.2.x to 1.3.0
 
