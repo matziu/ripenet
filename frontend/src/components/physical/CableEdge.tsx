@@ -1,4 +1,4 @@
-import { BaseEdge, getBezierPath, EdgeLabelRenderer } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, Position } from '@xyflow/react'
 import type { EdgeProps } from '@xyflow/react'
 import { useSelectionStore } from '@/stores/selection.store'
 import { useUIStore } from '@/stores/ui.store'
@@ -38,14 +38,26 @@ export function CableEdge({
   const toggleDetailPanel = useUIStore((s) => s.toggleDetailPanel)
   const detailPanelOpen = useUIStore((s) => s.detailPanelOpen)
 
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-  })
+  // Always build cable path that exits from the port handle direction first,
+  // then curves to the target. This guarantees the cable visually starts/ends
+  // at the port dot, never at a node edge.
+  const MIN_EXTEND = 40
+
+  const sourceDir = sourcePosition === Position.Left ? -1 : 1
+  const targetDir = targetPosition === Position.Left ? -1 : 1
+
+  // Control point extends from the handle in its direction by at least MIN_EXTEND
+  const dist = Math.sqrt((targetX - sourceX) ** 2 + (targetY - sourceY) ** 2) || 1
+  const extend = Math.max(MIN_EXTEND, dist * 0.3)
+
+  const cp1x = sourceX + sourceDir * extend
+  const cp1y = sourceY
+  const cp2x = targetX + targetDir * extend
+  const cp2y = targetY
+
+  const edgePath = `M ${sourceX},${sourceY} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${targetX},${targetY}`
+  const labelX = (sourceX + targetX + cp1x + cp2x) / 4
+  const labelY = (sourceY + targetY + cp1y + cp2y) / 4
 
   const color = getCableColor(d.cable_type)
   const displayLabel = d.label || d.cable_type
@@ -58,6 +70,14 @@ export function CableEdge({
 
   return (
     <>
+      {/* Background halo — creates a visible gap at crossings (like electrical schematics) */}
+      <path
+        d={edgePath}
+        fill="none"
+        className="stroke-background"
+        strokeWidth={10}
+        strokeLinecap="round"
+      />
       {/* Wider invisible path for easier click targeting */}
       <path
         d={edgePath}
@@ -75,7 +95,6 @@ export function CableEdge({
         style={{
           stroke: color,
           strokeWidth: 2.5,
-          opacity: 0.85,
         }}
       />
       <EdgeLabelRenderer>

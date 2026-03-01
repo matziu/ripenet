@@ -44,6 +44,7 @@ export function TopBar() {
 
   const handleViewChange = (mode: 'topology' | 'geo' | 'table' | 'physical') => {
     if (!projectId) return
+    if (mode === activeView) return
     if (mode === 'table') {
       navigate(`/projects/${projectId}/table/hosts`)
     } else {

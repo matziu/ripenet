@@ -71,6 +71,13 @@ export const PatchPanelNode = memo(function PatchPanelNode({ data }: NodeProps) 
                   )}
                   style={{ top: 'auto', position: 'absolute' }}
                 />
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  id={`port-${port.id}-left`}
+                  className="!w-2 !h-2 !bg-transparent !border-0 !left-[-5px]"
+                  style={{ top: 'auto', position: 'absolute' }}
+                />
                 <div className="flex-1 flex items-center justify-center gap-1.5 px-3">
                   <span
                     className={cn(
@@ -99,6 +106,13 @@ export const PatchPanelNode = memo(function PatchPanelNode({ data }: NodeProps) 
                       ? '!bg-amber-500 !border-amber-400'
                       : '!bg-muted-foreground/20 !border-muted-foreground/10',
                   )}
+                  style={{ top: 'auto', position: 'absolute' }}
+                />
+                <Handle
+                  type="target"
+                  position={Position.Right}
+                  id={`port-${port.id}-right`}
+                  className="!w-2 !h-2 !bg-transparent !border-0 !right-[-5px]"
                   style={{ top: 'auto', position: 'absolute' }}
                 />
               </div>

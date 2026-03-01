@@ -185,6 +185,14 @@ export function TunnelEdge({ source, target, data, id, markerEnd, markerStart }:
 
   return (
     <>
+      {/* Background halo — creates visible gap at crossings (like electrical schematics) */}
+      <path
+        d={edgePath}
+        fill="none"
+        className="stroke-background"
+        strokeWidth={10}
+        strokeLinecap="round"
+      />
       {/* Glow layer for active tunnels */}
       {status.animate && (
         <BaseEdge

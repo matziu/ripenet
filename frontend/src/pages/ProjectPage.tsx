@@ -6,14 +6,36 @@ import { GeoMap } from '@/components/geo/GeoMap'
 import { ProjectTableView } from '@/components/data/tables/ProjectTableView'
 import { PhysicalCanvas } from '@/components/physical/PhysicalCanvas'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useSelectionStore } from '@/stores/selection.store'
 
-function parseView(wildcard: string | undefined) {
-  if (!wildcard) return undefined
-  const view = wildcard.split('/')[0] as 'topology' | 'geo' | 'table' | 'physical'
-  if (view === 'topology' || view === 'geo' || view === 'table' || view === 'physical') return view
-  return undefined
+type ViewType = 'topology' | 'geo' | 'table' | 'physical'
+
+function parseWildcard(wildcard: string | undefined): {
+  view: ViewType | undefined
+  siteId: number | null
+  physicalMode: 'graph' | 'table'
+} {
+  if (!wildcard) return { view: undefined, siteId: null, physicalMode: 'graph' }
+  const parts = wildcard.split('/')
+  const view = parts[0] as ViewType
+  if (view !== 'topology' && view !== 'geo' && view !== 'table' && view !== 'physical') {
+    return { view: undefined, siteId: null, physicalMode: 'graph' }
+  }
+
+  let siteId: number | null = null
+  let physicalMode: 'graph' | 'table' = 'graph'
+
+  if (view === 'physical') {
+    // /projects/:id/physical/:siteId?/:mode?
+    if (parts[1]) {
+      const parsed = Number(parts[1])
+      if (!isNaN(parsed) && parsed > 0) siteId = parsed
+    }
+    if (parts[2] === 'table') physicalMode = 'table'
+  }
+
+  return { view, siteId, physicalMode }
 }
 
 export function ProjectPage() {
@@ -21,12 +43,34 @@ export function ProjectPage() {
   const id = Number(projectId)
   const navigate = useNavigate()
   const setSelectedProject = useSelectionStore((s) => s.setSelectedProject)
+  const setSelectedSite = useSelectionStore((s) => s.setSelectedSite)
 
-  const view = parseView(wildcard)
+  const { view, siteId: urlSiteId, physicalMode } = parseWildcard(wildcard)
 
   useEffect(() => {
     setSelectedProject(id)
   }, [id, setSelectedProject])
+
+  // Sync URL siteId to Zustand store (for physical view)
+  useEffect(() => {
+    if (view === 'physical' && urlSiteId !== null) {
+      setSelectedSite(urlSiteId)
+    }
+  }, [view, urlSiteId, setSelectedSite])
+
+  // Callback for PhysicalCanvas to navigate when site/mode changes
+  const handlePhysicalNavigate = useCallback(
+    (siteId: number | null, mode: 'graph' | 'table') => {
+      if (siteId === null) {
+        navigate(`/projects/${id}/physical`, { replace: true })
+      } else if (mode === 'table') {
+        navigate(`/projects/${id}/physical/${siteId}/table`, { replace: true })
+      } else {
+        navigate(`/projects/${id}/physical/${siteId}`, { replace: true })
+      }
+    },
+    [id, navigate],
+  )
 
   const { data: project } = useQuery({
     queryKey: ['project', id],
@@ -83,7 +127,14 @@ export function ProjectPage() {
         {view === 'topology' && <TopologyCanvas projectId={id} />}
         {view === 'geo' && <GeoMap projectId={id} />}
         {view === 'table' && <ProjectTableView projectId={id} />}
-        {view === 'physical' && <PhysicalCanvas projectId={id} />}
+        {view === 'physical' && (
+          <PhysicalCanvas
+            projectId={id}
+            urlSiteId={urlSiteId}
+            urlViewMode={physicalMode}
+            onNavigate={handlePhysicalNavigate}
+          />
+        )}
       </div>
     </div>
   )

@@ -15,6 +15,7 @@ import { DHCPPoolForm } from '@/components/data/forms/DHCPPoolForm'
 import { SubnetUtilBar } from '@/components/shared/SubnetUtilBar'
 import { ProjectForm } from '@/components/data/forms/ProjectForm'
 import { TunnelForm } from '@/components/data/forms/TunnelForm'
+import { PatchPanelForm } from '@/components/data/forms/PatchPanelForm'
 import { toast } from 'sonner'
 import type { Project, Site, VLAN, Subnet, Host, Tunnel, DHCPPool, PatchPanel } from '@/types'
 import {
@@ -49,9 +50,11 @@ export function Sidebar({ className, style }: SidebarProps) {
   const closeMobile = useCloseSidebarOnMobile()
 
   // Derive view suffix from current URL to preserve it when switching projects
-  const viewSuffix = projectId
+  // For physical view, strip siteId/mode since they are project-specific
+  const rawSuffix = projectId
     ? (location.pathname.split(`/projects/${projectId}`)[1] ?? '').replace(/^\//, '')
     : ''
+  const viewSuffix = rawSuffix.startsWith('physical') ? 'physical' : rawSuffix
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
@@ -270,6 +273,8 @@ function ProjectTreeItem({
 
 function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const location = useLocation()
   const expanded = useSelectionStore((s) => s.expandedSiteIds.has(site.id))
   const toggleExpanded = useSelectionStore((s) => s.toggleExpandedSite)
   const selectedSiteId = useSelectionStore((s) => s.selectedSiteId)
@@ -281,6 +286,7 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
 
   const [addVlanOpen, setAddVlanOpen] = useState(false)
   const [addStandaloneSubnetOpen, setAddStandaloneSubnetOpen] = useState(false)
+  const [addPatchPanelOpen, setAddPatchPanelOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
 
   const deleteMutation = useMutation({
@@ -316,9 +322,16 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
   const vlans = vlansData ?? []
   const patchPanels = patchPanelsData ?? []
 
+  // Check if we're in physical view — if so, navigate to URL with siteId
+  const isPhysicalView = location.pathname.includes(`/projects/${projectId}/physical`)
+
   const handleClick = () => {
     setSelectedSite(site.id)
-    if (!detailPanelOpen) toggleDetailPanel()
+    if (isPhysicalView) {
+      navigate(`/projects/${projectId}/physical/${site.id}`)
+    } else {
+      if (!detailPanelOpen) toggleDetailPanel()
+    }
     closeMobile()
   }
 
@@ -351,6 +364,7 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
         <DropdownMenu items={[
           { label: 'Add VLAN', icon: <Network className="h-3 w-3" />, onClick: () => setAddVlanOpen(true) },
           { label: 'Add Subnet', icon: <Server className="h-3 w-3" />, onClick: () => setAddStandaloneSubnetOpen(true) },
+          { label: 'Add Patch Panel', icon: <LayoutGrid className="h-3 w-3" />, onClick: () => setAddPatchPanelOpen(true) },
           { label: 'Edit', icon: <Pencil className="h-3 w-3" />, onClick: () => setEditOpen(true) },
           { label: 'Delete', icon: <Trash2 className="h-3 w-3" />, variant: 'destructive' as const, onClick: () => {
             if (window.confirm(`Delete site "${site.name}"?`)) deleteMutation.mutate()
@@ -381,6 +395,11 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
               Patch Panels{patchPanels.length > 0 && ` (${patchPanels.length})`}
             </span>
+            <div className="ml-auto">
+              <DropdownMenu items={[
+                { label: 'Add Patch Panel', icon: <LayoutGrid className="h-3 w-3" />, onClick: () => setAddPatchPanelOpen(true) },
+              ]} />
+            </div>
           </div>
           {patchPanels.map((pp) => (
             <PatchPanelTreeItem key={pp.id} patchPanel={pp} />
@@ -394,6 +413,10 @@ function SiteTreeItem({ site, projectId }: { site: Site; projectId: number }) {
 
       <Dialog open={addStandaloneSubnetOpen} onOpenChange={setAddStandaloneSubnetOpen} title="Add Standalone Subnet">
         <SubnetForm siteId={site.id} projectId={projectId} onClose={() => setAddStandaloneSubnetOpen(false)} />
+      </Dialog>
+
+      <Dialog open={addPatchPanelOpen} onOpenChange={setAddPatchPanelOpen} title="Add Patch Panel">
+        <PatchPanelForm siteId={site.id} onClose={() => setAddPatchPanelOpen(false)} />
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen} title="Edit Site">

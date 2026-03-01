@@ -1,6 +1,7 @@
 import { Panel } from '@xyflow/react'
 import { LayoutGrid } from 'lucide-react'
 import { getCableColor } from './CableEdge'
+import { PhysicalViewToggle } from './PhysicalTableView'
 
 const cableTypeLabels: Record<string, string> = {
   fiber_sm: 'Fiber SM',
@@ -14,19 +15,24 @@ const cableTypeLabels: Record<string, string> = {
 interface PhysicalToolbarProps {
   onRelayout: () => void
   visibleCableTypes: string[]
+  viewMode: 'graph' | 'table'
+  onViewModeChange: (mode: 'graph' | 'table') => void
 }
 
-export function PhysicalToolbar({ onRelayout, visibleCableTypes }: PhysicalToolbarProps) {
+export function PhysicalToolbar({ onRelayout, visibleCableTypes, viewMode, onViewModeChange }: PhysicalToolbarProps) {
   return (
     <>
       <Panel position="top-right">
-        <button
-          onClick={onRelayout}
-          className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-card/90 backdrop-blur-sm px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-accent transition-colors"
-        >
-          <LayoutGrid className="h-3.5 w-3.5" />
-          Re-layout
-        </button>
+        <div className="flex items-center gap-2">
+          <PhysicalViewToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
+          <button
+            onClick={onRelayout}
+            className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-card/90 backdrop-blur-sm px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-accent transition-colors"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Re-layout
+          </button>
+        </div>
       </Panel>
 
       {visibleCableTypes.length > 0 && (
