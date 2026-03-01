@@ -349,16 +349,21 @@ class CableSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Cannot connect a port to itself.")
         exclude_pk = self.instance.pk if self.instance else None
         from django.db import models as db_models
+
+        def _check_port(port, field_name):
+            existing = Cable.objects.filter(
+                db_models.Q(port_a=port) | db_models.Q(port_b=port)
+            ).exclude(pk=exclude_pk).count()
+            is_pp = port.patch_panel_id is not None
+            max_cables = 2 if is_pp else 1
+            if existing >= max_cables:
+                msg = "This patch panel port already has 2 cables." if is_pp else "This port is already connected."
+                raise serializers.ValidationError({field_name: msg})
+
         if port_a:
-            if Cable.objects.filter(
-                db_models.Q(port_a=port_a) | db_models.Q(port_b=port_a)
-            ).exclude(pk=exclude_pk).exists():
-                raise serializers.ValidationError({"port_a": "This port is already connected."})
+            _check_port(port_a, "port_a")
         if port_b:
-            if Cable.objects.filter(
-                db_models.Q(port_a=port_b) | db_models.Q(port_b=port_b)
-            ).exclude(pk=exclude_pk).exists():
-                raise serializers.ValidationError({"port_b": "This port is already connected."})
+            _check_port(port_b, "port_b")
         return attrs
 
 

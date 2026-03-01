@@ -2,10 +2,10 @@ from django.db import models
 
 
 class Cable(models.Model):
-    port_a = models.OneToOneField(
+    port_a = models.ForeignKey(
         "ipam.DevicePort", on_delete=models.CASCADE, related_name="cable_as_a",
     )
-    port_b = models.OneToOneField(
+    port_b = models.ForeignKey(
         "ipam.DevicePort", on_delete=models.CASCADE, related_name="cable_as_b",
     )
     cable_type = models.CharField(max_length=30, default="cat6")

@@ -267,12 +267,19 @@ function physicalToFlow(
     })
   })
 
+  // Per-side connected sets for PP — populated after edge creation
+  const ppConnectedLeft = new Set<number>()
+  const ppConnectedRight = new Set<number>()
+
   data.patch_panels.forEach((pp) => {
     const nodeId = `pp-${pp.id}`
     ppNodeIds.add(nodeId)
     const nodeData: PatchPanelNodeData = {
       ...pp,
       connectedPorts: connectedPortIds,
+      connectedLeftPorts: ppConnectedLeft,
+      connectedRightPorts: ppConnectedRight,
+      lockedPorts: new Set(),
     }
     nodes.push({
       id: nodeId,
@@ -287,18 +294,19 @@ function physicalToFlow(
     })
   })
 
+  // Phase 1: Create edges with temporary PP handles (will be fixed after layout)
   data.cables.forEach((cable) => {
     const sourceNode = portToNode.get(cable.port_a)
     const targetNode = portToNode.get(cable.port_b)
     if (sourceNode && targetNode) {
-      // For patch panel handles, choose the correct side:
-      // - If connecting to a node on the left, use -left handle
-      // - If connecting to a node on the right, use -right handle
-      // For simplicity, use -right for source side and -left for target side of patch panels
-      const sourceHandle = ppNodeIds.has(sourceNode)
-        ? `${portToHandleId.get(cable.port_a)}-right`
+      const sourceIsPP = ppNodeIds.has(sourceNode)
+      const targetIsPP = ppNodeIds.has(targetNode)
+      const sameNode = sourceNode === targetNode
+
+      const sourceHandle = sourceIsPP
+        ? `${portToHandleId.get(cable.port_a)}-left`
         : portToHandleId.get(cable.port_a)
-      const targetHandle = ppNodeIds.has(targetNode)
+      const targetHandle = targetIsPP
         ? `${portToHandleId.get(cable.port_b)}-left`
         : portToHandleId.get(cable.port_b)
 
@@ -309,7 +317,7 @@ function physicalToFlow(
         sourceHandle,
         targetHandle,
         type: 'cableEdge',
-        data: { ...cable },
+        data: { ...cable, _sameNode: sameNode },
       })
     }
   })
@@ -322,10 +330,11 @@ function physicalToFlow(
     result = { nodes, edges }
   }
 
-  // Compute portSide for each host based on neighbor positions
+  // Phase 2: Recompute sides based on final positions
   const posMap = new Map<string, number>()
   for (const n of result.nodes) posMap.set(n.id, n.position.x)
 
+  // Compute portSide for each host based on neighbor positions
   const adj = new Map<string, string[]>()
   for (const n of result.nodes) adj.set(n.id, [])
   for (const e of result.edges) {
@@ -340,6 +349,49 @@ function physicalToFlow(
     if (neighbors.length === 0) continue
     const avgX = neighbors.reduce((s, nid) => s + (posMap.get(nid) ?? 0), 0) / neighbors.length
     ;(node.data as HostNodeData).portSide = avgX >= myX ? 'right' : 'left'
+  }
+
+  // Recompute PP edge handles: device to the left of PP → left handle, to the right → right handle
+  const ppPortUsedSide = new Map<number, 'left' | 'right'>()
+  ppConnectedLeft.clear()
+  ppConnectedRight.clear()
+
+  for (const edge of result.edges) {
+    const sourceIsPP = ppNodeIds.has(edge.source)
+    const targetIsPP = ppNodeIds.has(edge.target)
+    const sameNode = edge.source === edge.target
+    const ed = edge.data as { port_a: number; port_b: number }
+
+    if (sameNode && sourceIsPP) {
+      // PP-to-PP on same panel: both handles on the right so cable loops outside
+      edge.sourceHandle = `port-${ed.port_a}-right`
+      edge.targetHandle = `port-${ed.port_b}-right`
+      ppConnectedRight.add(ed.port_a)
+      ppConnectedRight.add(ed.port_b)
+      continue
+    }
+
+    if (sourceIsPP) {
+      const ppX = posMap.get(edge.source) ?? 0
+      const otherX = posMap.get(edge.target) ?? 0
+      const preferred: 'left' | 'right' = otherX <= ppX ? 'left' : 'right'
+      const used = ppPortUsedSide.get(ed.port_a)
+      const side = used ? (used === preferred ? (preferred === 'left' ? 'right' : 'left') : preferred) : preferred
+      ppPortUsedSide.set(ed.port_a, side)
+      edge.sourceHandle = `port-${ed.port_a}-${side}`
+      ;(side === 'left' ? ppConnectedLeft : ppConnectedRight).add(ed.port_a)
+    }
+
+    if (targetIsPP) {
+      const ppX = posMap.get(edge.target) ?? 0
+      const otherX = posMap.get(edge.source) ?? 0
+      const preferred: 'left' | 'right' = otherX <= ppX ? 'left' : 'right'
+      const used = ppPortUsedSide.get(ed.port_b)
+      const side = used ? (used === preferred ? (preferred === 'left' ? 'right' : 'left') : preferred) : preferred
+      ppPortUsedSide.set(ed.port_b, side)
+      edge.targetHandle = `port-${ed.port_b}-${side}`
+      ;(side === 'left' ? ppConnectedLeft : ppConnectedRight).add(ed.port_b)
+    }
   }
 
   return result
@@ -373,6 +425,93 @@ function recomputePortSides(nodes: Node[], edges: Edge[]): Node[] {
   return changed ? result : nodes
 }
 
+// --- Recompute PP edge handles based on current node positions ---
+
+function recomputePPEdges(
+  nodes: Node[],
+  edges: Edge[],
+  lockedPorts?: Set<number>,
+): { edges: Edge[]; ppConnLeft: Set<number>; ppConnRight: Set<number> } | null {
+  const posMap = new Map<string, number>()
+  const ppNodeIds = new Set<string>()
+  for (const n of nodes) {
+    posMap.set(n.id, n.position.x)
+    if (n.type === 'patchPanelNode') ppNodeIds.add(n.id)
+  }
+
+  if (ppNodeIds.size === 0) return null
+
+  const ppPortUsedSide = new Map<number, 'left' | 'right'>()
+  const ppConnLeft = new Set<number>()
+  const ppConnRight = new Set<number>()
+
+  let changed = false
+  const newEdges = edges.map((edge) => {
+    const sourceIsPP = ppNodeIds.has(edge.source)
+    const targetIsPP = ppNodeIds.has(edge.target)
+    if (!sourceIsPP && !targetIsPP) return edge
+
+    const sameNode = edge.source === edge.target
+    const ed = edge.data as { port_a: number; port_b: number }
+    let newSourceHandle = edge.sourceHandle
+    let newTargetHandle = edge.targetHandle
+
+    if (sameNode && sourceIsPP) {
+      newSourceHandle = `port-${ed.port_a}-right`
+      newTargetHandle = `port-${ed.port_b}-right`
+      ppConnRight.add(ed.port_a)
+      ppConnRight.add(ed.port_b)
+    } else {
+      if (sourceIsPP) {
+        // If port is locked, keep current handle side
+        if (lockedPorts?.has(ed.port_a) && edge.sourceHandle) {
+          const curSide = edge.sourceHandle.endsWith('-left') ? 'left' as const : 'right' as const
+          ppPortUsedSide.set(ed.port_a, curSide)
+          ;(curSide === 'left' ? ppConnLeft : ppConnRight).add(ed.port_a)
+        } else {
+          const ppX = posMap.get(edge.source) ?? 0
+          const otherX = posMap.get(edge.target) ?? 0
+          const preferred: 'left' | 'right' = otherX <= ppX ? 'left' : 'right'
+          const used = ppPortUsedSide.get(ed.port_a)
+          const side = used
+            ? used === preferred ? (preferred === 'left' ? 'right' : 'left') : preferred
+            : preferred
+          ppPortUsedSide.set(ed.port_a, side)
+          newSourceHandle = `port-${ed.port_a}-${side}`
+          ;(side === 'left' ? ppConnLeft : ppConnRight).add(ed.port_a)
+        }
+      }
+
+      if (targetIsPP) {
+        if (lockedPorts?.has(ed.port_b) && edge.targetHandle) {
+          const curSide = edge.targetHandle.endsWith('-left') ? 'left' as const : 'right' as const
+          ppPortUsedSide.set(ed.port_b, curSide)
+          ;(curSide === 'left' ? ppConnLeft : ppConnRight).add(ed.port_b)
+        } else {
+          const ppX = posMap.get(edge.target) ?? 0
+          const otherX = posMap.get(edge.source) ?? 0
+          const preferred: 'left' | 'right' = otherX <= ppX ? 'left' : 'right'
+          const used = ppPortUsedSide.get(ed.port_b)
+          const side = used
+            ? used === preferred ? (preferred === 'left' ? 'right' : 'left') : preferred
+            : preferred
+          ppPortUsedSide.set(ed.port_b, side)
+          newTargetHandle = `port-${ed.port_b}-${side}`
+          ;(side === 'left' ? ppConnLeft : ppConnRight).add(ed.port_b)
+        }
+      }
+    }
+
+    if (newSourceHandle !== edge.sourceHandle || newTargetHandle !== edge.targetHandle) {
+      changed = true
+      return { ...edge, sourceHandle: newSourceHandle, targetHandle: newTargetHandle }
+    }
+    return edge
+  })
+
+  return changed ? { edges: newEdges, ppConnLeft, ppConnRight } : null
+}
+
 // --- Stats panel ---
 
 function PhysicalStats({ data }: { data: PhysicalTopology }) {
@@ -404,9 +543,24 @@ interface PhysicalCanvasInnerProps {
   onViewModeChange: (mode: 'graph' | 'table') => void
 }
 
+function loadLockedPorts(siteId: number): Set<number> {
+  const raw = localStorage.getItem(`physical-locked-ports-${siteId}`)
+  if (raw) {
+    try { return new Set(JSON.parse(raw)) } catch { /* ignore */ }
+  }
+  return new Set()
+}
+
+function saveLockedPorts(siteId: number, locked: Set<number>) {
+  localStorage.setItem(`physical-locked-ports-${siteId}`, JSON.stringify([...locked]))
+}
+
 function PhysicalCanvasInner({ siteId, viewMode, onViewModeChange }: PhysicalCanvasInnerProps) {
   const { fitView } = useReactFlow()
   const [layoutKey, setLayoutKey] = useState(0)
+  const [lockedPPPorts, setLockedPPPorts] = useState<Set<number>>(() => loadLockedPorts(siteId))
+  const lockedRef = useRef(lockedPPPorts)
+  lockedRef.current = lockedPPPorts
   const deviceTypeMap = useDeviceTypes()
 
   const { data: physicalData, isLoading } = useQuery({
@@ -434,18 +588,43 @@ function PhysicalCanvasInner({ siteId, viewMode, onViewModeChange }: PhysicalCan
   // Force React Flow to recalculate handle positions after data/layout changes
   const updateNodeInternals = useUpdateNodeInternals()
 
+  // Per-port lock toggle
+  const togglePortLock = useCallback((portId: number) => {
+    setLockedPPPorts((prev) => {
+      const next = new Set(prev)
+      if (next.has(portId)) next.delete(portId)
+      else next.add(portId)
+      saveLockedPorts(siteId, next)
+      // Update PP node data to reflect lock change
+      setNodes((nodes) =>
+        nodes.map((n) =>
+          n.type === 'patchPanelNode'
+            ? { ...n, data: { ...n.data, lockedPorts: next } }
+            : n,
+        ),
+      )
+      return next
+    })
+  }, [siteId, setNodes])
+
   useEffect(() => {
-    setNodes(initialNodes)
+    // Inject lockedPorts + onTogglePortLock into PP node data
+    const nodesWithLock = initialNodes.map((n) =>
+      n.type === 'patchPanelNode'
+        ? { ...n, data: { ...n.data, lockedPorts: lockedPPPorts, onTogglePortLock: togglePortLock } }
+        : n,
+    )
+    setNodes(nodesWithLock)
     setEdges(initialEdges)
     // Handles may have moved (portSide changed) — tell React Flow to re-measure
     const hostIds = initialNodes.filter((n) => n.type === 'hostNode').map((n) => n.id)
     if (hostIds.length > 0) {
-      // Wait for DOM to paint with new handle positions, then re-measure
       requestAnimationFrame(() => {
         requestAnimationFrame(() => updateNodeInternals(hostIds))
       })
     }
-  }, [initialNodes, initialEdges, setNodes, setEdges, updateNodeInternals])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialNodes, initialEdges, setNodes, setEdges, updateNodeInternals, togglePortLock])
 
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -462,23 +641,45 @@ function PhysicalCanvasInner({ siteId, viewMode, onViewModeChange }: PhysicalCan
     [onNodesChange, siteId],
   )
 
-  // Recompute port sides live during drag + force handle recalculation
-  const onNodeDrag = useCallback(() => {
-    setNodes((prev) => {
-      const next = recomputePortSides(prev, edgesRef.current)
-      if (next !== prev) {
-        // Collect IDs of nodes whose portSide changed
-        const changed: string[] = []
-        for (let i = 0; i < next.length; i++) {
-          if (next[i] !== prev[i]) changed.push(next[i].id)
-        }
-        if (changed.length > 0) {
-          requestAnimationFrame(() => updateNodeInternals(changed))
-        }
-      }
-      return next
+  // Recompute port sides + PP edge handles live during drag
+  const onNodeDrag = useCallback((_evt: React.MouseEvent, _node: Node, dragNodes: Node[]) => {
+    // Merge dragged positions into our node state
+    const dragPosMap = new Map<string, { x: number; y: number }>()
+    for (const dn of dragNodes) dragPosMap.set(dn.id, dn.position)
+
+    const curNodes = nodesRef.current.map((n) => {
+      const dp = dragPosMap.get(n.id)
+      return dp ? { ...n, position: dp } : n
     })
-  }, [setNodes, updateNodeInternals])
+    const curEdges = edgesRef.current
+
+    // 1. Recompute host port sides
+    let nextNodes = recomputePortSides(curNodes, curEdges)
+
+    // 2. Recompute PP edge handles (respecting per-port locks)
+    const edgeUpdate = recomputePPEdges(nextNodes, curEdges, lockedRef.current)
+    if (edgeUpdate) {
+      const { ppConnLeft, ppConnRight } = edgeUpdate
+      nextNodes = nextNodes.map((node) =>
+        node.type === 'patchPanelNode'
+          ? { ...node, data: { ...node.data, connectedLeftPorts: ppConnLeft, connectedRightPorts: ppConnRight } }
+          : node,
+      )
+      setEdges(edgeUpdate.edges)
+    }
+
+    // 3. Apply node changes + notify React Flow about changed handles
+    if (nextNodes !== curNodes) {
+      setNodes(nextNodes)
+      const changed: string[] = []
+      for (let i = 0; i < nextNodes.length; i++) {
+        if (nextNodes[i] !== curNodes[i]) changed.push(nextNodes[i].id)
+      }
+      if (changed.length > 0) {
+        requestAnimationFrame(() => updateNodeInternals(changed))
+      }
+    }
+  }, [setNodes, setEdges, updateNodeInternals])
 
   const onNodeDragStop = useCallback(() => {
     savePhysicalPositions(siteId, nodesRef.current)

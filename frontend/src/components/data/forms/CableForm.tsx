@@ -67,17 +67,25 @@ export function CableForm({ siteId, cable, onClose }: CableFormProps) {
     return list
   }, [topology])
 
-  // Determine used port IDs (exclude ports of cable being edited)
-  const usedPortIds = useMemo(() => {
-    if (!topology) return new Set<number>()
-    const set = new Set<number>()
+  // Count cables per port (exclude cable being edited)
+  const portCableCount = useMemo(() => {
+    if (!topology) return new Map<number, number>()
+    const map = new Map<number, number>()
     topology.cables.forEach((c) => {
       if (cable && c.id === cable.id) return
-      set.add(c.port_a)
-      set.add(c.port_b)
+      map.set(c.port_a, (map.get(c.port_a) ?? 0) + 1)
+      map.set(c.port_b, (map.get(c.port_b) ?? 0) + 1)
     })
-    return set
+    return map
   }, [topology, cable])
+
+  // PP port IDs (patch panel ports can have up to 2 cables)
+  const ppPortIds = useMemo(() => {
+    if (!topology) return new Set<number>()
+    const set = new Set<number>()
+    topology.patch_panels.forEach((pp) => pp.ports.forEach((p) => set.add(p.id)))
+    return set
+  }, [topology])
 
   // Find initial device keys for edit mode
   const initialDeviceA = useMemo(() => {
@@ -131,25 +139,31 @@ export function CableForm({ siteId, cable, onClose }: CableFormProps) {
   const watchPortA = watch('port_a')
   const watchPortB = watch('port_b')
 
-  // Get available ports for device A (free + currently selected)
+  // Check if port is available for a new cable connection
+  const isPortAvailable = (portId: number, editPortId?: number) => {
+    if (editPortId && portId === editPortId) return true // currently selected in edit mode
+    const count = portCableCount.get(portId) ?? 0
+    const maxCables = ppPortIds.has(portId) ? 2 : 1
+    return count < maxCables
+  }
+
+  // Get available ports for device A (free or partially free PP + currently selected)
   const portsForDeviceA = useMemo(() => {
     const device = devices.find((d) => d.key === watchDeviceA)
     if (!device) return []
-    return device.ports.filter(
-      (p) => !usedPortIds.has(p.id) || (cable && p.id === cable.port_a),
-    )
-  }, [devices, watchDeviceA, usedPortIds, cable])
+    return device.ports.filter((p) => isPortAvailable(p.id, cable?.port_a))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devices, watchDeviceA, portCableCount, ppPortIds, cable])
 
-  // Get available ports for device B (free + currently selected, minus port A selection)
+  // Get available ports for device B (free or partially free PP + currently selected, minus port A)
   const portsForDeviceB = useMemo(() => {
     const device = devices.find((d) => d.key === watchDeviceB)
     if (!device) return []
     return device.ports.filter(
-      (p) =>
-        (!usedPortIds.has(p.id) || (cable && p.id === cable.port_b)) &&
-        String(p.id) !== watchPortA,
+      (p) => isPortAvailable(p.id, cable?.port_b) && String(p.id) !== watchPortA,
     )
-  }, [devices, watchDeviceB, usedPortIds, cable, watchPortA])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devices, watchDeviceB, portCableCount, ppPortIds, cable, watchPortA])
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) => {

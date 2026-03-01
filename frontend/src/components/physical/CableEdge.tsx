@@ -42,13 +42,15 @@ export function CableEdge({
   // then curves to the target. This guarantees the cable visually starts/ends
   // at the port dot, never at a node edge.
   const MIN_EXTEND = 40
+  const isSameNode = !!(d as CableEdgeData & { _sameNode?: boolean })._sameNode
 
   const sourceDir = sourcePosition === Position.Left ? -1 : 1
   const targetDir = targetPosition === Position.Left ? -1 : 1
 
   // Control point extends from the handle in its direction by at least MIN_EXTEND
   const dist = Math.sqrt((targetX - sourceX) ** 2 + (targetY - sourceY) ** 2) || 1
-  const extend = Math.max(MIN_EXTEND, dist * 0.3)
+  // For same-node (PP-to-PP loopback), extend much further so the loop is clearly visible
+  const extend = isSameNode ? Math.max(80, dist * 0.5 + 60) : Math.max(MIN_EXTEND, dist * 0.3)
 
   const cp1x = sourceX + sourceDir * extend
   const cp1y = sourceY

@@ -9,6 +9,10 @@ import type { PhysicalPatchPanel } from '@/types'
 
 export interface PatchPanelNodeData extends PhysicalPatchPanel {
   connectedPorts: Set<number>
+  connectedLeftPorts: Set<number>
+  connectedRightPorts: Set<number>
+  lockedPorts: Set<number>
+  onTogglePortLock?: (portId: number) => void
   [key: string]: unknown
 }
 
@@ -54,6 +58,10 @@ export const PatchPanelNode = memo(function PatchPanelNode({ data }: NodeProps) 
         <div className="border-t border-border/30 px-1.5 py-1.5 space-y-0.5">
           {d.ports.map((port) => {
             const isConnected = d.connectedPorts.has(port.id)
+            const leftConnected = d.connectedLeftPorts?.has(port.id) ?? false
+            const rightConnected = d.connectedRightPorts?.has(port.id) ?? false
+            const isLocked = d.lockedPorts?.has(port.id) ?? false
+            const canLock = leftConnected || rightConnected
             return (
               <div
                 key={port.id}
@@ -65,8 +73,10 @@ export const PatchPanelNode = memo(function PatchPanelNode({ data }: NodeProps) 
                   id={`port-${port.id}-left`}
                   className={cn(
                     '!w-2 !h-2 !border-2 !left-[-5px]',
-                    isConnected
-                      ? '!bg-amber-500 !border-amber-400'
+                    leftConnected
+                      ? isLocked
+                        ? '!bg-amber-500 !border-red-400 !ring-1 !ring-red-400/60'
+                        : '!bg-amber-500 !border-amber-400'
                       : '!bg-muted-foreground/20 !border-muted-foreground/10',
                   )}
                   style={{ top: 'auto', position: 'absolute' }}
@@ -78,6 +88,15 @@ export const PatchPanelNode = memo(function PatchPanelNode({ data }: NodeProps) 
                   className="!w-2 !h-2 !bg-transparent !border-0 !left-[-5px]"
                   style={{ top: 'auto', position: 'absolute' }}
                 />
+                {/* Left lock click zone */}
+                {leftConnected && (
+                  <div
+                    className="absolute left-[-8px] w-4 h-4 cursor-pointer z-10"
+                    style={{ top: '50%', transform: 'translateY(-50%)' }}
+                    onClick={(e) => { e.stopPropagation(); d.onTogglePortLock?.(port.id) }}
+                    title={isLocked ? 'Odblokuj stronę kabla' : 'Zablokuj stronę kabla'}
+                  />
+                )}
                 <div className="flex-1 flex items-center justify-center gap-1.5 px-3">
                   <span
                     className={cn(
@@ -95,6 +114,11 @@ export const PatchPanelNode = memo(function PatchPanelNode({ data }: NodeProps) 
                   >
                     {port.port_type}
                   </span>
+                  {isLocked && canLock && (
+                    <span className="text-[8px] text-red-400" title="Strona kabla zablokowana">
+                      🔒
+                    </span>
+                  )}
                 </div>
                 <Handle
                   type="source"
@@ -102,8 +126,10 @@ export const PatchPanelNode = memo(function PatchPanelNode({ data }: NodeProps) 
                   id={`port-${port.id}-right`}
                   className={cn(
                     '!w-2 !h-2 !border-2 !right-[-5px]',
-                    isConnected
-                      ? '!bg-amber-500 !border-amber-400'
+                    rightConnected
+                      ? isLocked
+                        ? '!bg-amber-500 !border-red-400 !ring-1 !ring-red-400/60'
+                        : '!bg-amber-500 !border-amber-400'
                       : '!bg-muted-foreground/20 !border-muted-foreground/10',
                   )}
                   style={{ top: 'auto', position: 'absolute' }}
@@ -115,6 +141,15 @@ export const PatchPanelNode = memo(function PatchPanelNode({ data }: NodeProps) 
                   className="!w-2 !h-2 !bg-transparent !border-0 !right-[-5px]"
                   style={{ top: 'auto', position: 'absolute' }}
                 />
+                {/* Right lock click zone */}
+                {rightConnected && (
+                  <div
+                    className="absolute right-[-8px] w-4 h-4 cursor-pointer z-10"
+                    style={{ top: '50%', transform: 'translateY(-50%)' }}
+                    onClick={(e) => { e.stopPropagation(); d.onTogglePortLock?.(port.id) }}
+                    title={isLocked ? 'Odblokuj stronę kabla' : 'Zablokuj stronę kabla'}
+                  />
+                )}
               </div>
             )
           })}
