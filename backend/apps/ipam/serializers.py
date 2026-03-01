@@ -311,7 +311,7 @@ class DevicePortSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
     def get_cable(self, obj):
-        cable = getattr(obj, "cable_as_a", None) or getattr(obj, "cable_as_b", None)
+        cable = obj.cable_as_a.first() or obj.cable_as_b.first()
         if cable:
             return {"id": cable.id, "cable_type": cable.cable_type, "label": cable.label}
         return None
